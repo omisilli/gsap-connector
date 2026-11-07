@@ -1,0 +1,312 @@
+<!doctype html>
+<!-- Open by double-clicking: everything loads from jsDelivr, not from ../..
+     Pinned to this release, so the page and the code always match.
+     ?lenis: the same page with Lenis. ?off: without the connector, to see
+     what it does. -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>gsap-connector — example</title>
+        <!-- Only takes effect with ?lenis: it styles html.lenis. -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" />
+        <style>
+            :root {
+                --bg: #f6f6f4;
+                --surface: #ffffff;
+                --fg: #18181b;
+                --muted: #6b6b72;
+                --line: #e4e4e0;
+                --accent: #2f5bea;
+                color-scheme: light dark;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #111113;
+                    --surface: #1b1b1f;
+                    --fg: #ededef;
+                    --muted: #9a9aa3;
+                    --line: #2c2c31;
+                    --accent: #7c9cff;
+                }
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+            }
+            body {
+                font:
+                    16px/1.6 system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                color: var(--fg);
+                background: var(--bg);
+            }
+            code {
+                font:
+                    0.85em/1.4 ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    monospace;
+                padding: 0.15em 0.4em;
+                border-radius: 0.35em;
+                background: color-mix(in srgb, var(--fg) 8%, transparent);
+            }
+            main {
+                max-width: 46rem;
+                margin: 0 auto;
+                padding: 4rem 1.25rem;
+                display: grid;
+                gap: 3rem;
+            }
+            h1 {
+                font-size: 1.6rem;
+            }
+            h2 {
+                font-size: 1.1rem;
+                margin-bottom: 0.5rem;
+            }
+            section > p,
+            header > p {
+                color: var(--muted);
+                margin-bottom: 1rem;
+            }
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                align-items: center;
+            }
+            .row a,
+            .row button {
+                font: inherit;
+                font-size: 0.9rem;
+                color: inherit;
+                padding: 0.4rem 0.9rem;
+                border: 1px solid var(--line);
+                border-radius: 0.6rem;
+                background: var(--surface);
+                cursor: pointer;
+                text-decoration: none;
+            }
+            .row [aria-current="true"] {
+                background: var(--fg);
+                color: var(--bg);
+                border-color: var(--fg);
+            }
+            .status {
+                font:
+                    0.85rem/1.6 ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    monospace;
+                white-space: pre;
+                padding: 0.75rem 1rem;
+                border: 1px solid var(--line);
+                border-radius: 0.75rem;
+                background: var(--surface);
+            }
+
+            /* Content that arrives late: grows the page above the card. */
+            .grown {
+                display: grid;
+                gap: 0.5rem;
+            }
+            .grown div {
+                height: 200px;
+                border-radius: 0.75rem;
+                background: color-mix(in srgb, var(--fg) 8%, transparent);
+                display: grid;
+                place-items: center;
+                color: var(--muted);
+            }
+
+            .space {
+                height: 70vh;
+            }
+            .card {
+                width: 6rem;
+                height: 10rem;
+                border-radius: 0.75rem;
+                background: var(--accent);
+            }
+
+            /* Pinned: the section stays while its strip slides across. */
+            .pin {
+                height: 100vh;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                background: color-mix(in srgb, var(--fg) 6%, transparent);
+            }
+            .strip {
+                display: flex;
+                gap: 1.5rem;
+                padding-inline: 1.5rem;
+            }
+            .strip div {
+                flex: 0 0 min(70vw, 32rem);
+                height: 50vh;
+                border-radius: 0.75rem;
+                background: var(--surface);
+                border: 1px solid var(--line);
+                display: grid;
+                place-items: center;
+                font-size: 2rem;
+                color: var(--muted);
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <header>
+                <h1>gsap-connector</h1>
+                <p>
+                    GSAP's ScrollTrigger and the page, with or without Lenis. GSAP itself is loaded by the page —
+                    the connector takes it: <code>connectGsap({ gsap, ScrollTrigger, lenis })</code>.
+                </p>
+                <div class="row">
+                    <a id="lenis-on" href="?lenis">With Lenis</a>
+                    <a id="lenis-off" href="?">Without Lenis</a>
+                    <a id="connector-off">Without the connector</a>
+                </div>
+            </header>
+
+            <section>
+                <h2>What is running</h2>
+                <div class="status" id="status"></div>
+            </section>
+
+            <section>
+                <h2>The page grows — the trigger moves with it</h2>
+                <p>
+                    Content that arrives late — a list loaded after the page, an image, an accordion — moves
+                    everything below it. ScrollTrigger measures its start and end on load and resize only; the
+                    connector refreshes them when the page changes height. The coloured lines on the right are
+                    ScrollTrigger's own markers: grow the page and watch them follow the card — or, without the
+                    connector, stay where they were.
+                </p>
+                <div class="row">
+                    <button type="button" id="grow">Grow the page above the card</button>
+                    <button type="button" id="shrink">Take it away</button>
+                </div>
+            </section>
+
+            <div class="grown" id="grown"></div>
+
+            <section>
+                <h2>A card that widens as it scrolls through</h2>
+                <p>
+                    <code>scrub: true</code> — tied to the scroll itself: scroll back, it narrows. With Lenis the
+                    scroll glides, and the card glides with it.
+                </p>
+            </section>
+            <div class="space"></div>
+            <div class="card" id="card"></div>
+            <div class="space"></div>
+        </main>
+
+        <section class="pin" id="pin">
+            <div class="strip" id="strip">
+                <div>1</div>
+                <div>2</div>
+                <div>3</div>
+                <div>4</div>
+            </div>
+        </section>
+
+        <main>
+            <section>
+                <h2>Pinned, with or without Lenis</h2>
+                <p>
+                    The section above stood still while its strip slid across — <code>pin: true</code>, scrubbed
+                    by the scroll. Pinning adds height to the page; the connector refreshes the triggers after it.
+                </p>
+            </section>
+            <div class="space"></div>
+        </main>
+
+        <!-- GSAP: the page's own, loaded once. -->
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
+        <script type="module">
+            import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.0/dist/index.js";
+
+            const { gsap, ScrollTrigger } = window;
+            gsap.registerPlugin(ScrollTrigger);
+
+            const query = new URLSearchParams(location.search);
+            const withLenis = query.has("lenis");
+            const connected = !query.has("off");
+
+            // ?lenis: Lenis with its own loop — the connector switches it to
+            // GSAP's ticker.
+            let lenis = null;
+            if (withLenis) {
+                const { default: Lenis } = await import("https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.mjs");
+                lenis = new Lenis({ autoRaf: true });
+            }
+
+            // The one line. ?off leaves it out: Lenis and ScrollTrigger then
+            // never meet, and nothing refreshes the triggers.
+            if (connected) connectGsap({ gsap, ScrollTrigger, lenis });
+
+            gsap.fromTo(
+                "#card",
+                { width: "6rem" },
+                {
+                    width: "100%",
+                    ease: "none",
+                    scrollTrigger: { trigger: "#card", start: "top 85%", end: "top 25%", scrub: true, markers: true },
+                },
+            );
+
+            const strip = document.getElementById("strip");
+            gsap.to(strip, {
+                x: () => -(strip.scrollWidth - innerWidth),
+                ease: "none",
+                scrollTrigger: {
+                    trigger: "#pin",
+                    start: "top top",
+                    end: () => `+=${strip.scrollWidth - innerWidth}`,
+                    scrub: true,
+                    pin: true,
+                    invalidateOnRefresh: true,
+                },
+            });
+
+            // The page grows: late content above the card.
+            const grown = document.getElementById("grown");
+            document.getElementById("grow").addEventListener("click", () => {
+                const box = document.createElement("div");
+                box.textContent = "Arrived late — 200px";
+                grown.append(box);
+            });
+            document.getElementById("shrink").addEventListener("click", () => grown.lastElementChild?.remove());
+
+            // The switches, and what is running.
+            document.getElementById(withLenis ? "lenis-on" : "lenis-off").setAttribute("aria-current", "true");
+            const off = document.getElementById("connector-off");
+            const next = new URLSearchParams(query);
+            if (connected) next.set("off", "");
+            else next.delete("off");
+            off.href = `?${next.toString().replace(/=(&|$)/g, "$1")}`;
+            off.textContent = connected ? "Without the connector" : "With the connector";
+            if (!connected) off.setAttribute("aria-current", "true");
+
+            const status = document.getElementById("status");
+            const show = () => {
+                const t = ScrollTrigger.getAll()[0];
+                status.textContent =
+                    `connector    : ${connected ? "on" : "off"}\n` +
+                    `Lenis        : ${lenis ? (lenis.options.autoRaf ? "its own loop" : "on GSAP's ticker") : "none — the browser's scroll"}\n` +
+                    `card trigger : starts at ${Math.round(t.start)}px`;
+            };
+            show();
+            ScrollTrigger.addEventListener("refresh", show);
+        </script>
+    </body>
+</html>
