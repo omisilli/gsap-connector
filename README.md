@@ -92,6 +92,25 @@ ticker's `time * 1000`, which starts elsewhere. Lenis measures each frame
 from the one before; switching between two clocks would throw it by the
 difference once.
 
+### With Lenis, smooth once
+
+Lenis already smooths the scroll. Two settings keep it to that one
+smoothing:
+
+- **`scrub: true`, not a number.** `scrub: 1` makes an animation catch up
+  with the scroll over a second — on top of Lenis's own glide it trails
+  twice over and feels heavy. Without Lenis, a number is what smooths it:
+
+  ```js
+  scrollTrigger: { trigger: ".scene", pin: true, scrub: lenis ? true : 1 }
+  ```
+
+- **Lenis with `lerp`, not `duration`.** Its default, `lerp: 0.1`, closes a
+  tenth of the gap each frame: a trackpad's stream of wheel events reads as
+  one glide. Given `duration` and `easing`, Lenis starts that curve again on
+  every wheel event — the speed jumps each time, and a scrubbed scene jumps
+  with it. Leave both out; `scrollTo` can still take a duration of its own.
+
 ### One connection at a time
 
 A new `connectGsap` ends the one before. The older cleanup, if it comes
