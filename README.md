@@ -10,7 +10,7 @@ Lenis, runs Lenis on GSAP's ticker so the two never part. No dependencies.
 
 ```sh
 npm install gsap
-npm install github:omisilli/gsap-connector#v1.0.0
+npm install github:omisilli/gsap-connector#v1.0.1
 ```
 
 ```ts
@@ -26,13 +26,18 @@ connectGsap({ gsap, ScrollTrigger, lenis });   // with Lenis
 
 It returns its own cleanup.
 
+`index.css` is empty — connecting needs no CSS. Import it anyway
+(`@plusguard/gsap-connector/index.css`, or in your theme's CSS): a rule
+added in a later release then reaches you with no new import line.
+
 ### Without a build step
 
 ```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.1/index.css" />
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
 <script type="module">
-    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.0/dist/index.js";
+    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.1/dist/index.js";
 
     gsap.registerPlugin(ScrollTrigger);
     connectGsap({ gsap, ScrollTrigger });

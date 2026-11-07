@@ -1,0 +1,5 @@
+/*
+ * gsap-connector — the CSS half. Empty: connecting GSAP to the page needs
+ * no CSS. It is here so that a theme imports it from the first day, and a
+ * rule added later reaches every site without a new import line.
+ */
