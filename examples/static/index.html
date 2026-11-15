@@ -268,8 +268,8 @@
                 <h2>Recipe — a word that opens onto a picture</h2>
                 <p>
                     No package of its own: plain GSAP, a few lines below. The picture shows only through the
-                    letters; as the scroll goes on the word comes at you, from the stroke nearest its middle, until
-                    the picture fills the screen. Scroll back, and it closes again.
+                    letters; as the scroll goes on the word comes at you from its middle and leaves the screen, the
+                    picture opening as it goes — then the picture stays whole a while, and the page scrolls on. Scroll back, and it closes again.
                 </p>
             </section>
             <div class="space"></div>
@@ -349,74 +349,23 @@
                 },
             });
 
-            // Recipe — a word that opens onto a picture. The word grows from
-            // the stroke of a letter nearest its middle — nearly centred, and
-            // ending on picture: from the very middle it would end on the gap
-            // between two letters, the screen dark. Grown until that stroke is
-            // wider than the screen, the picture is whole, with no fade.
+            // Recipe — a word that opens onto a picture, in three parts of the
+            // scroll: the word grows from its middle and leaves the screen
+            // (0–0.75); as it does, the mask's white fades in, so the gap
+            // between its letters opens onto the picture too (0.45–0.75); then
+            // the picture stays whole (0.75–1) until the section scrolls on.
             // One smoothing: Lenis glides already; without it, scrub: 1 does.
-            const word = document.getElementById("reveal-word");
             if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
                 gsap.set("#reveal-open", { opacity: 1 });
             } else {
-                const stroke = strokeNearMiddle(word);
                 gsap.timeline({
-                    scrollTrigger: {
-                        trigger: "#reveal",
-                        start: "top top",
-                        end: "bottom bottom",
-                        scrub: lenis ? true : 1,
-                        invalidateOnRefresh: true, // the scale, again, when the screen changes
-                    },
-                }).fromTo(
-                    word,
-                    { scale: 1 },
-                    {
-                        // Wide enough that the stroke reaches past both sides of
-                        // the screen from where it grows.
-                        scale: () => {
-                            const box = word.getBBox();
-                            const at = box.x + stroke.at * box.width;
-                            return (2.2 * Math.max(at, innerWidth - at)) / (stroke.width * box.width);
-                        },
-                        transformOrigin: `${(stroke.at * 100).toFixed(2)}% 50%`,
-                        ease: "power3.in",
-                    },
-                );
-            }
-
-            // The stroke nearest the word's middle, as fractions of its width:
-            // where it is and how wide. Drawn once on a canvas in the word's
-            // own font and read across its middle row.
-            function strokeNearMiddle(text) {
-                const style = getComputedStyle(text);
-                const size = 200;
-                const spacing = (parseFloat(style.letterSpacing) || 0) * (size / parseFloat(style.fontSize));
-                const canvas = document.createElement("canvas");
-                const pen = canvas.getContext("2d", { willReadFrequently: true });
-                const set = () => {
-                    pen.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
-                    pen.letterSpacing = `${spacing}px`;
-                    pen.textBaseline = "middle";
-                };
-                set();
-                const width = Math.ceil(pen.measureText(text.textContent).width);
-                canvas.width = width;
-                canvas.height = size * 1.4;
-                set(); // a canvas resized forgets its pen
-                pen.fillText(text.textContent, 0, canvas.height / 2);
-                const row = pen.getImageData(0, canvas.height / 2, width, 1).data;
-                let best = null;
-                for (let x = 0, from = -1; x <= width; x++) {
-                    const ink = x < width && row[x * 4 + 3] > 128;
-                    if (ink && from < 0) from = x;
-                    if (!ink && from >= 0) {
-                        const stroke = { at: (from + x) / 2 / width, width: (x - from) / width };
-                        if (!best || Math.abs(stroke.at - 0.5) < Math.abs(best.at - 0.5)) best = stroke;
-                        from = -1;
-                    }
-                }
-                return best || { at: 0.5, width: 1 }; // no ink found: the middle
+                    scrollTrigger: { trigger: "#reveal", start: "top top", end: "bottom bottom", scrub: lenis ? true : 1 },
+                })
+                    // "50% 50%": from the middle, whatever the word. "40% 50%"
+                    // leans it to the right, "60% 50%" to the left.
+                    .fromTo("#reveal-word", { scale: 1 }, { scale: 30, transformOrigin: "50% 50%", ease: "power2.in", duration: 0.75 }, 0)
+                    .fromTo("#reveal-open", { opacity: 0 }, { opacity: 1, ease: "power1.inOut", duration: 0.3 }, 0.45)
+                    .set({}, {}, 1); // the last quarter: the picture, whole
             }
 
             // The page grows: late content above the card.

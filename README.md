@@ -179,9 +179,10 @@ each. The connector only keeps them in step with the scroll, Lenis or not.
 
 ### A word that opens onto a picture
 
-The picture shows only through the letters of a word; as the page scrolls
-the word comes at you — grows from the stroke nearest its middle — until
-the picture fills the screen. Scroll back and it closes again.
+The picture shows only through the letters of a word. As the page scrolls
+the word comes at you from its middle and leaves the screen, the picture
+opening as it goes; then the picture stays whole a while, and the page
+scrolls on. Scroll back and it closes into the word again.
 
 ```html
 <section class="reveal">
@@ -208,59 +209,18 @@ the picture fills the screen. Scroll back and it closes again.
 ```
 
 ```js
-const word = document.getElementById("reveal-word");
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
     gsap.set("#reveal-open", { opacity: 1 }); // the picture, open
 } else {
-    const stroke = strokeNearMiddle(word);
     gsap.timeline({
-        scrollTrigger: {
-            trigger: ".reveal",
-            start: "top top",
-            end: "bottom bottom",
-            scrub: lenis ? true : 1,
-            invalidateOnRefresh: true,
-        },
-    }).fromTo(word, { scale: 1 }, {
-        scale: () => {
-            const box = word.getBBox();
-            const at = box.x + stroke.at * box.width;
-            return (2.2 * Math.max(at, innerWidth - at)) / (stroke.width * box.width);
-        },
-        transformOrigin: `${stroke.at * 100}% 50%`,
-        ease: "power3.in",
-    });
-}
-
-function strokeNearMiddle(text) {
-    const style = getComputedStyle(text);
-    const size = 200;
-    const spacing = (parseFloat(style.letterSpacing) || 0) * (size / parseFloat(style.fontSize));
-    const canvas = document.createElement("canvas");
-    const pen = canvas.getContext("2d", { willReadFrequently: true });
-    const set = () => {
-        pen.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
-        pen.letterSpacing = `${spacing}px`;
-        pen.textBaseline = "middle";
-    };
-    set();
-    const width = Math.ceil(pen.measureText(text.textContent).width);
-    canvas.width = width;
-    canvas.height = size * 1.4;
-    set(); // a canvas resized forgets its pen
-    pen.fillText(text.textContent, 0, canvas.height / 2);
-    const row = pen.getImageData(0, canvas.height / 2, width, 1).data;
-    let best = null;
-    for (let x = 0, from = -1; x <= width; x++) {
-        const ink = x < width && row[x * 4 + 3] > 128;
-        if (ink && from < 0) from = x;
-        if (!ink && from >= 0) {
-            const stroke = { at: (from + x) / 2 / width, width: (x - from) / width };
-            if (!best || Math.abs(stroke.at - 0.5) < Math.abs(best.at - 0.5)) best = stroke;
-            from = -1;
-        }
-    }
-    return best || { at: 0.5, width: 1 }; // no ink found: the middle
+        scrollTrigger: { trigger: ".reveal", start: "top top", end: "bottom bottom", scrub: lenis ? true : 1 },
+    })
+        // 0 – 0.75: the word grows from its middle, out of the screen
+        .fromTo("#reveal-word", { scale: 1 }, { scale: 30, transformOrigin: "50% 50%", ease: "power2.in", duration: 0.75 }, 0)
+        // 0.45 – 0.75: the mask's white comes in — the gaps open too
+        .fromTo("#reveal-open", { opacity: 0 }, { opacity: 1, ease: "power1.inOut", duration: 0.3 }, 0.45)
+        // 0.75 – 1: the picture, whole
+        .set({}, {}, 1);
 }
 ```
 
@@ -268,18 +228,24 @@ function strokeNearMiddle(text) {
   picture, black hides it. The word is real text in the SVG — any font the
   page has, any word, no image of it to make — and it needs no `-webkit-`
   prefix anywhere.
-- **It grows from the stroke nearest its middle.** From the very middle a
-  word would end on the gap between two letters — a dark screen. So
-  `strokeNearMiddle` draws the word once on a canvas, in its own font, and
-  reads across its middle row for the stroke closest to the centre — in
-  AUDI, the right side of the U. The word grows from there: nearly centred,
-  for any word.
-- **It ends whole, with no fade.** The scale is worked out so that stroke
-  grows wider than the screen from where it stands — the picture ends
-  uncovered, on any screen. `invalidateOnRefresh` works it out again when
-  the window changes.
-- **`power3.in`:** slow at first, so the word answers the first scroll
-  without rushing at you; fast at the end.
+- **From the middle, whatever the word.** `transformOrigin: "50% 50%"`
+  needs nothing measured: change the word, the font or the language and it
+  still grows from its centre.
+- **The gaps open too.** Grown from its middle, a word may well end on the
+  space between two letters — a dark screen. So, as the word leaves, the
+  mask's white rectangle fades in: whatever is still dark opens onto the
+  picture, and by three quarters of the way the picture is whole, on any
+  word and any screen.
+- **It holds, then scrolls on.** The last quarter of the timeline is empty
+  (`.set({}, {}, 1)`): the picture stays whole, sticky, while the scroll
+  goes on — then the section ends and the page carries it away. Change the
+  `0.75`s to give the hold more or less of the scroll; make the section
+  taller for a longer scene.
+- **Leaning one way (optional).** `"40% 50%"` grows the word more to the
+  right, `"60% 50%"` more to the left — for a design that wants it. Leave it
+  at `"50% 50%"` otherwise.
+- **`power2.in`:** slow at first, so the word answers the first scroll
+  without rushing at you; fast as it leaves.
 - **Held by CSS `sticky`, not `pin: true`.** The section is four screens
   tall in the first HTML. A pin adds its height only when the script runs —
   on a reload the browser restores the scroll to the shorter page, then the
