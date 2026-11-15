@@ -185,28 +185,40 @@ screen, the picture opening out of that letter; the moment the picture is
 whole, the page scrolls on. Every time, by default: scroll back and it
 closes into the word again. Or only the first time:
 `data-pg-gsap-connector-reveal="once"` on the section, and once open it
-stays open.
+stays open — one screen tall, no stretch to wait through, up or down.
 
 ```html
-<section class="reveal">  <!-- data-pg-gsap-connector-reveal="once": only the first time -->
-    <div class="reveal-stage">
+<section class="pg-gsap-connector-reveal" id="reveal">  <!-- data-pg-gsap-connector-reveal="once": only the first time -->
+    <div class="pg-gsap-connector-reveal-stage">
         <img src="car.avif" alt="AUDI — a car, seen through the letters" />
-        <div class="reveal-cover" aria-hidden="true"><span class="reveal-word">AUDI</span></div>
+        <div class="pg-gsap-connector-reveal-cover" aria-hidden="true"><span class="pg-gsap-connector-reveal-word">AUDI</span></div>
     </div>
 </section>
+<!-- Only with "once": right after the section, a classic script. Played
+     already in this tab, it is one screen tall before the page is drawn. -->
+<script>
+    (function (scene) {
+        try {
+            var key = "pg-gsap-connector-reveal:" + location.pathname + "#" + scene.id;
+            if (scene.getAttribute("data-pg-gsap-connector-reveal") === "once" && sessionStorage.getItem(key)) {
+                scene.setAttribute("data-pg-gsap-connector-reveal-played", "");
+            }
+        } catch (e) {}
+    })(document.getElementById("reveal"));
+</script>
 ```
 
 ```css
-.reveal { height: 325svh; background: #0d0d0f; }          /* the scene: 225svh of scroll */
-.reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; display: grid; isolation: isolate; }
-.reveal-stage > * { grid-area: 1 / 1; }
-.reveal-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.reveal-cover { display: grid; place-items: center; background: #0d0d0f; mix-blend-mode: darken; }
+.pg-gsap-connector-reveal { height: 325svh; background: #000; }          /* the scene: 225svh of scroll */
+.pg-gsap-connector-reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; display: grid; isolation: isolate; }
+.pg-gsap-connector-reveal-stage > * { grid-area: 1 / 1; }
+.pg-gsap-connector-reveal-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pg-gsap-connector-reveal-cover { display: grid; place-items: center; background: #000; mix-blend-mode: darken; }
 /* --pg-gsap-connector-reveal-origin: the point the word grows from, as fractions of the word.
    The middle of a stroke near the centre — for AUDI in this font, the right
    leg of the U (49.7–58.1% across): 54%. Set it for your word and font;
    not set, the middle. */
-.reveal-word {
+.pg-gsap-connector-reveal-word {
     --pg-gsap-connector-reveal-origin: 54% 50%;
     font: 900 min(28vw, 45svh) / 1 system-ui, sans-serif;
     letter-spacing: -0.03em;
@@ -214,24 +226,43 @@ stays open.
     color: #fff;
     transform-origin: var(--pg-gsap-connector-reveal-origin, 50% 50%);
 }
-@media (prefers-reduced-motion: reduce) { .reveal { height: auto; } }
+/* Played once already: one screen, the picture open — no scene left. */
+.pg-gsap-connector-reveal[data-pg-gsap-connector-reveal-played] { height: 100svh; }
+[data-pg-gsap-connector-reveal-played] .pg-gsap-connector-reveal-cover { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .pg-gsap-connector-reveal { height: auto; } }
 ```
 
 ```js
-const reveal = document.querySelector(".reveal");
+const reveal = document.getElementById("reveal");
+const PLAYED = "data-pg-gsap-connector-reveal-played";
+const playedKey = `pg-gsap-connector-reveal:${location.pathname}#${reveal.id}`;
+const once = reveal.getAttribute("data-pg-gsap-connector-reveal") === "once";
+
+// Once: when the picture is whole the trigger goes, the timeline stays,
+// finished — and the section is one screen from now on, the scroll kept on
+// what it showed. st.animation: on a load below the section the first
+// refresh comes while the timeline is still being made.
+const stayOpen = (st) => {
+    if (st.progress < 0.99) return;
+    const timeline = st.animation;
+    st.kill(false, true);
+    gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
+    try { sessionStorage.setItem(playedKey, "1"); } catch {}
+    const stage = reveal.firstElementChild;
+    const before = stage.getBoundingClientRect().top;
+    reveal.setAttribute(PLAYED, "");
+    const shift = stage.getBoundingClientRect().top - before;
+    if (shift) {
+        const top = scrollY + shift;
+        if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
+        else scrollTo({ top, behavior: "instant" });
+    }
+    requestAnimationFrame(() => ScrollTrigger.refresh()); // the page below moved
+};
+
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    gsap.set(".reveal-cover", { autoAlpha: 0 }); // the picture, open
-} else {
-    const once = reveal.getAttribute("data-pg-gsap-connector-reveal") === "once";
-    // Once: when the picture is whole, the trigger goes and the timeline
-    // stays, finished. st.animation — on a reload below the section the
-    // first refresh comes while the timeline is still being made.
-    const stayOpen = (st) => {
-        if (st.progress < 0.99) return;
-        const timeline = st.animation;
-        st.kill(false, true);
-        gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
-    };
+    gsap.set(".pg-gsap-connector-reveal-cover", { autoAlpha: 0 }); // the picture, open
+} else if (!reveal.hasAttribute(PLAYED)) {
     gsap.timeline({
         scrollTrigger: {
             trigger: reveal,
@@ -239,14 +270,14 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
             end: "bottom bottom",
             scrub: lenis ? true : 1,
             onUpdate: once ? stayOpen : undefined,
-            onRefresh: once ? stayOpen : undefined,
+            onRefresh: once ? stayOpen : undefined, // a load below it
         },
     })
         // the word grows from its point, out of the screen
-        .fromTo(".reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
+        .fromTo(".pg-gsap-connector-reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
         // 0.85 – 1: the stroke covers the screen by now; the cover fades for
         // a word whose point sits on a gap — and the scene ends, whole
-        .fromTo(".reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
+        .fromTo(".pg-gsap-connector-reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
 }
 ```
 
@@ -258,6 +289,9 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
   word in a mask is drawn wrong by the GPU — dark bands across the screen,
   sooner on a Retina display — while a scaled element is drawn in tiles,
   only what is on screen. `isolation: isolate` keeps the blend to the stage.
+  The dark is black, `#000`: `darken` keeps whichever is darker, so a
+  dark grey would let the photo's own darkest pixels through — a faint
+  ghost of the picture around the letters.
 - **Where it grows from: `--pg-gsap-connector-reveal-origin`, set for the word.** Grown from
   its exact middle, a word ends wherever its middle happens to fall — on
   the edge of a letter, and that edge, a pixel off the centre, slides
@@ -289,12 +323,24 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
 - **Every time, or only the first time.** By default the scene is tied to
   the scroll both ways: scroll back up and the picture closes into the
   word again. `data-pg-gsap-connector-reveal="once"` plays it the first
-  time only — when the
-  picture is whole, `kill(false, true)` removes the trigger but keeps the
-  timeline, and a short tween takes it to its end: from then on the
-  picture is open, whichever way the page scrolls. `onRefresh` covers a
-  reload below the section: the page opens there with the picture already
-  open. "The first time" is per page view — nothing is stored.
+  time only. When the picture is whole, `kill(false, true)` removes the
+  trigger but keeps the timeline, and a short tween takes it to its end.
+  Then the section gets `data-pg-gsap-connector-reveal-played` and is one
+  screen tall: a picture that scrolls by like any block — no 225svh of a
+  scene with nothing left in it, waited through on the way back up or on
+  the way down again. The page above the viewport is shorter by that
+  much, so the scroll moves with it — measured on the stage, before and
+  after — and the screen shows just what it did.
+- **"The first time" is the tab's.** The played scene is kept in
+  `sessionStorage`, per page and section id. That is for the reload: a
+  page that shrank while it was read would be 225svh taller again when it
+  reloads, and the browser would put the scroll a scene's height away
+  from where the reader was. So the little classic script right after the
+  section marks it played as the HTML is read — before anything is drawn,
+  before the browser restores the scroll — and the page comes back just as
+  it was left. A new tab plays it again. `onRefresh` covers the first load
+  below the section — a link to something further down: the scene is
+  played and folded there and then.
 - **`power3.in`:** slow at first, so the word answers the first scroll
   without rushing at you; fast as it leaves.
 - **Held by CSS `sticky`, not `pin: true`.** The section is its full

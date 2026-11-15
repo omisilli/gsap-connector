@@ -169,15 +169,15 @@
              * so a reload restores the scroll to the shorter page and then
              * jumps.
              */
-            .reveal {
+            .pg-gsap-connector-reveal {
                 height: 325svh;
-                background: #0d0d0f;
+                background: #000;
             }
             /* The stage: the photo, and over it a dark cover with the word
                in white. The cover blends "darken": white keeps the photo,
                the dark keeps the dark — the photo shows through the letters.
                isolation keeps the blend to the stage. */
-            .reveal-stage {
+            .pg-gsap-connector-reveal-stage {
                 position: sticky;
                 top: 0;
                 height: 100svh;
@@ -185,19 +185,19 @@
                 display: grid;
                 isolation: isolate;
             }
-            .reveal-stage > * {
+            .pg-gsap-connector-reveal-stage > * {
                 grid-area: 1 / 1;
             }
-            .reveal-stage img {
+            .pg-gsap-connector-reveal-stage img {
                 display: block;
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
             }
-            .reveal-cover {
+            .pg-gsap-connector-reveal-cover {
                 display: grid;
                 place-items: center;
-                background: #0d0d0f;
+                background: #000;
                 mix-blend-mode: darken;
             }
             /* The word.
@@ -208,7 +208,7 @@
                sliding aside. For AUDI here, the right leg of the U (49.7–58.1%
                across): 54%. Another word, font or letter-spacing — another
                value; a breakpoint can set its own. Not set: the middle. */
-            .reveal-word {
+            .pg-gsap-connector-reveal-word {
                 --pg-gsap-connector-reveal-origin: 54% 50%;
                 font: 900 min(28vw, 45svh) / 1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
                 letter-spacing: -0.03em;
@@ -216,9 +216,17 @@
                 color: #fff;
                 transform-origin: var(--pg-gsap-connector-reveal-origin, 50% 50%);
             }
+            /* Played once already (data-pg-gsap-connector-reveal="once"): one
+               screen, the picture open — no scene left to wait through. */
+            .pg-gsap-connector-reveal[data-pg-gsap-connector-reveal-played] {
+                height: 100svh;
+            }
+            [data-pg-gsap-connector-reveal-played] .pg-gsap-connector-reveal-cover {
+                visibility: hidden;
+            }
             /* Reduced motion: the picture, open, one screen tall. */
             @media (prefers-reduced-motion: reduce) {
-                .reveal {
+                .pg-gsap-connector-reveal {
                     height: auto;
                 }
             }
@@ -296,25 +304,44 @@
                     No package of its own: plain GSAP, a few lines below. The picture shows only through the
                     letters; as the scroll goes on the word comes at you from inside the U and leaves the screen,
                     the picture opening out of the letter — and the moment the picture is whole, the page scrolls on.
-                    Every time: scroll back, and it closes again. Only the first time: once open, it stays open —
+                    Every time: scroll back, and it closes again. Only the first time: once open, it stays open and
+                    shrinks to one screen — no stretch to wait through, up or down, and a reload keeps it so —
                     <code>data-pg-gsap-connector-reveal="once"</code> on the section.
                 </p>
                 <div class="row">
-                    <button type="button" data-play="always">Every time</button>
-                    <button type="button" data-play="once">Only the first time</button>
+                    <a id="play-always" href="?">Every time</a>
+                    <a id="play-once" href="?once">Only the first time</a>
                 </div>
             </section>
-            <div class="space"></div>
         </main>
 
         <!-- The recipe: the photo, and a dark cover with the word in white
              over it, blended — the photo shows through the letters. -->
-        <section class="reveal" id="reveal">
-            <div class="reveal-stage">
+        <section class="pg-gsap-connector-reveal" id="reveal">
+            <div class="pg-gsap-connector-reveal-stage">
                 <img src="./media/car.avif" alt="AUDI — a car, seen through the letters" />
-                <div class="reveal-cover" aria-hidden="true"><span class="reveal-word">AUDI</span></div>
+                <div class="pg-gsap-connector-reveal-cover" aria-hidden="true"><span class="pg-gsap-connector-reveal-word">AUDI</span></div>
             </div>
         </section>
+        <!-- The example's switch, ?once: the setting, written as the HTML is read. -->
+        <script>
+            if (new URLSearchParams(location.search).has("once")) {
+                document.currentScript.previousElementSibling.setAttribute("data-pg-gsap-connector-reveal", "once");
+            }
+        </script>
+        <!-- The recipe's early part, right after the section: played already in
+             this tab, it is one screen tall before the page is drawn — so a
+             reload lands where it was, not a scene's height away. -->
+        <script>
+            (function (scene) {
+                try {
+                    var key = "pg-gsap-connector-reveal:" + location.pathname + "#" + scene.id;
+                    if (scene.getAttribute("data-pg-gsap-connector-reveal") === "once" && sessionStorage.getItem(key)) {
+                        scene.setAttribute("data-pg-gsap-connector-reveal-played", "");
+                    }
+                } catch (e) {}
+            })(document.getElementById("reveal"));
+        </script>
 
         <main>
             <section>
@@ -381,60 +408,56 @@
             // whole, and the section scrolls on at once — no hold.
             // One smoothing: Lenis glides already; without it, scrub: 1 does.
             //
-            // data-pg-gsap-connector-reveal="once" on the section: once the picture is whole the
-            // scene lets go of the scroll and stays open — scroll back, the
-            // picture is there. Not set: every time, both ways.
-            const PLAY = "data-pg-gsap-connector-reveal";
+            // data-pg-gsap-connector-reveal="once": once the picture is whole
+            // the scene lets go of the scroll, stays open and shrinks to one
+            // screen, remembered for this tab. Not set: every time, both ways.
             const reveal = document.getElementById("reveal");
-            let scene = null;
-            const playReveal = () => {
-                // The switch below builds it again: the old one goes first.
-                scene?.scrollTrigger?.kill();
-                scene?.kill();
-                gsap.set([".reveal-word", ".reveal-cover"], { clearProps: "transform,opacity,visibility" });
-                if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-                    gsap.set(".reveal-cover", { autoAlpha: 0 });
-                    return;
-                }
-                const once = reveal.getAttribute(PLAY) === "once";
-                // Whole: the trigger goes, the timeline stays — finished.
-                // st.animation, not scene: on a reload below the section the
-                // first refresh comes while the timeline is still being made.
-                const stayOpen = (st) => {
-                    if (st.progress < 0.99) return;
-                    const timeline = st.animation;
-                    st.kill(false, true);
-                    gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
-                };
-                scene = gsap
-                    .timeline({
-                        scrollTrigger: {
-                            trigger: reveal,
-                            start: "top top",
-                            end: "bottom bottom",
-                            scrub: lenis ? true : 1,
-                            onUpdate: once ? stayOpen : undefined,
-                            onRefresh: once ? stayOpen : undefined, // a reload below it
-                        },
-                    })
-                    .fromTo(".reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
-                    .fromTo(".reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
-            };
-            playReveal();
+            const PLAYED = "data-pg-gsap-connector-reveal-played";
+            const playedKey = `pg-gsap-connector-reveal:${location.pathname}#${reveal.id}`;
+            const once = reveal.getAttribute("data-pg-gsap-connector-reveal") === "once";
 
-            // The switch: every time, or only the first time.
-            const plays = document.querySelectorAll("[data-play]");
-            const markPlay = () =>
-                plays.forEach((b) => b.setAttribute("aria-current", String(b.dataset.play === (reveal.getAttribute(PLAY) || "always"))));
-            plays.forEach((b) =>
-                b.addEventListener("click", () => {
-                    if (b.dataset.play === "once") reveal.setAttribute(PLAY, "once");
-                    else reveal.removeAttribute(PLAY);
-                    markPlay();
-                    playReveal();
-                }),
-            );
-            markPlay();
+            // Whole: the trigger goes, the timeline stays — finished; and the
+            // section is one screen from now on. st.animation, not a variable:
+            // on a load below the section the first refresh comes while the
+            // timeline is still being made.
+            const stayOpen = (st) => {
+                if (st.progress < 0.99) return;
+                const timeline = st.animation;
+                st.kill(false, true);
+                gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
+                try {
+                    sessionStorage.setItem(playedKey, "1");
+                } catch {}
+                // The page above is shorter now: the scroll moves with it,
+                // so the screen shows just what it did.
+                const stage = reveal.firstElementChild;
+                const before = stage.getBoundingClientRect().top;
+                reveal.setAttribute(PLAYED, "");
+                const shift = stage.getBoundingClientRect().top - before;
+                if (shift) {
+                    const top = scrollY + shift;
+                    if (lenis) lenis.scrollTo(top, { immediate: true, force: true });
+                    else scrollTo({ top, behavior: "instant" });
+                }
+                requestAnimationFrame(() => ScrollTrigger.refresh()); // the page below moved
+            };
+
+            if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                gsap.set(".pg-gsap-connector-reveal-cover", { autoAlpha: 0 });
+            } else if (!reveal.hasAttribute(PLAYED)) {
+                gsap.timeline({
+                    scrollTrigger: {
+                        trigger: reveal,
+                        start: "top top",
+                        end: "bottom bottom",
+                        scrub: lenis ? true : 1,
+                        onUpdate: once ? stayOpen : undefined,
+                        onRefresh: once ? stayOpen : undefined, // a load below it
+                    },
+                })
+                    .fromTo(".pg-gsap-connector-reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
+                    .fromTo(".pg-gsap-connector-reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
+            }
 
             // The page grows: late content above the card.
             const grown = document.getElementById("grown");
@@ -445,13 +468,28 @@
             });
             document.getElementById("shrink").addEventListener("click", () => grown.lastElementChild?.remove());
 
-            // The switches, and what is running.
+            // The switches — each link keeps the others — and what is running.
+            const link = (name, on) => {
+                const next = new URLSearchParams(query);
+                if (on) next.set(name, "");
+                else next.delete(name);
+                return `?${next.toString().replace(/=(&|$)/g, "$1")}`;
+            };
+            document.getElementById("lenis-on").href = link("lenis", true);
+            document.getElementById("lenis-off").href = link("lenis", false);
             document.getElementById(withLenis ? "lenis-on" : "lenis-off").setAttribute("aria-current", "true");
+            const playOnce = document.getElementById("play-once");
+            document.getElementById("play-always").href = link("once", false);
+            playOnce.href = link("once", true);
+            document.getElementById(once ? "play-once" : "play-always").setAttribute("aria-current", "true");
+            // Choosing it again plays it again: the tab forgets it was played.
+            playOnce.addEventListener("click", () => {
+                try {
+                    sessionStorage.removeItem(playedKey);
+                } catch {}
+            });
             const off = document.getElementById("connector-off");
-            const next = new URLSearchParams(query);
-            if (connected) next.set("off", "");
-            else next.delete("off");
-            off.href = `?${next.toString().replace(/=(&|$)/g, "$1")}`;
+            off.href = link("off", connected);
             off.textContent = connected ? "Without the connector" : "With the connector";
             if (!connected) off.setAttribute("aria-current", "true");
 
