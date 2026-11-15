@@ -21,6 +21,7 @@ export type LenisLike = {
         immediate?: boolean;
         force?: boolean;
     }): void;
+    isScrolling?: boolean | string;
     destroy(): void;
     options: {
         autoRaf?: boolean;

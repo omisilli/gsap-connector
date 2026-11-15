@@ -2,8 +2,9 @@
 
 GSAP's ScrollTrigger and the page, with or without Lenis — in one line. It
 refreshes the triggers when the page changes height, brings a reload back
-to where the page was left, pins and all, and, on a page with Lenis, runs
-Lenis on GSAP's ticker so the two never part. No dependencies.
+to where the page was left and a `#` link to its element, pins and all,
+and, on a page with Lenis, runs Lenis on GSAP's ticker so the two never
+part. No dependencies.
 
 > **GSAP is not in this package — install it yourself.** The connector
 > takes the GSAP your site already has: one copy on the page, the version
@@ -11,7 +12,7 @@ Lenis on GSAP's ticker so the two never part. No dependencies.
 
 ```sh
 npm install gsap
-npm install github:omisilli/gsap-connector#v1.1.0
+npm install github:omisilli/gsap-connector#v1.1.1
 ```
 
 ```ts
@@ -34,11 +35,11 @@ added in a later release then reaches you with no new import line.
 ### Without a build step
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/index.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.1/index.css" />
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
 <script type="module">
-    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/dist/index.js";
+    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.1/dist/index.js";
 
     gsap.registerPlugin(ScrollTrigger);
     connectGsap({ gsap, ScrollTrigger });
@@ -79,12 +80,21 @@ later) adds it to a page the browser has already measured. The scroll
 comes back short by that spacing: below a pinned section, a reload lands
 higher than you were.
 
+A link to a `#id` below a pin goes wrong the same way: the browser goes
+to the element before the pin is in, and the pin then pushes it down.
+
 The connector keeps the scroll for this tab, saved as the page goes. On a
-reload, or back and forward, it puts it back after the triggers are
-refreshed — until the page has loaded, then it lets go. It leaves the
-scroll alone when the visitor scrolls first, when the address has a `#`
-(the page goes there instead), on a first visit, and with a Lenis that
-scrolls a box of its own rather than the page.
+reload, or back and forward — `#` or not, as the browser does itself — it
+puts it back after the triggers are refreshed. On a first visit to an
+address with a `#`, it puts that element back at the top of the screen,
+where the browser meant it to be (its `scroll-margin-top` and the page's
+`scroll-padding-top` kept). Either way, after each refresh until the page
+has loaded, then it lets go.
+
+It leaves the scroll alone when the visitor scrolls first, on a first
+visit with no `#`, and with a Lenis that scrolls a box of its own rather
+than the page. A `#` element that is hidden — in a closed tab — or one
+Lenis is already gliding to is left to the page's own anchor code.
 
 A site that keeps the scroll itself turns it off:
 
@@ -232,7 +242,9 @@ stays open — one screen tall, no stretch to wait through, up or down.
 ```
 
 ```css
-.pg-gsap-connector-reveal { height: 325svh; background: #000; }          /* the scene: 225svh of scroll */
+/* --pg-gsap-connector-reveal-length: the scene — how far the page scrolls while
+   the word grows and leaves. Shorter is faster. Not set: 225svh. */
+.pg-gsap-connector-reveal { height: calc(100svh + var(--pg-gsap-connector-reveal-length, 225svh)); background: #000; }
 .pg-gsap-connector-reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; display: grid; isolation: isolate; }
 .pg-gsap-connector-reveal-stage > * { grid-area: 1 / 1; }
 .pg-gsap-connector-reveal-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -340,23 +352,28 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
   `visibility: hidden` — nothing drawn over the picture.
 - **Whole, then it scrolls on — no hold.** The timeline ends as the
   picture is whole, at the section's `bottom bottom`: the very next scroll
-  carries the picture away with the section. For a slower scene make the
-  section taller; for a hold, an empty stretch at the end of the timeline
-  (`.set({}, {}, 1.2)`) keeps it whole a while.
+  carries the picture away with the section. For a hold, an empty stretch
+  at the end of the timeline (`.set({}, {}, 1.2)`) keeps it whole a while.
+- **How fast: `--pg-gsap-connector-reveal-length`.** The scene is the
+  scroll it takes — 225svh by default, a little over two screens. Shorter
+  is faster: `100svh` and the word is gone in one screen's scroll. Set it
+  on the section or any parent, in the CSS; a breakpoint can set its own.
+  The script reads nothing: the trigger runs `top top` to `bottom bottom`,
+  whatever the height.
 - **Every time, or only the first time.** By default the scene is tied to
   the scroll both ways: scroll back up and the picture closes into the
   word again. `data-pg-gsap-connector-reveal="once"` plays it the first
   time only. When the picture is whole, `kill(false, true)` removes the
   trigger but keeps the timeline, and a short tween takes it to its end.
   Then the section gets `data-pg-gsap-connector-reveal-played` and is one
-  screen tall: a picture that scrolls by like any block — no 225svh of a
-  scene with nothing left in it, waited through on the way back up or on
+  screen tall: a picture that scrolls by like any block — no scene with
+  nothing left in it, waited through on the way back up or on
   the way down again. The page above the viewport is shorter by that
   much, so the scroll moves with it — measured on the stage, before and
   after — and the screen shows just what it did.
 - **"The first time" is the tab's.** The played scene is kept in
   `sessionStorage`, per page and section id. That is for the reload: a
-  page that shrank while it was read would be 225svh taller again when it
+  page that shrank while it was read would be a scene taller again when it
   reloads, and the browser would put the scroll a scene's height away
   from where the reader was. So the little classic script right after the
   section marks it played as the HTML is read — before anything is drawn,
@@ -367,9 +384,9 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
 - **`power3.in`:** slow at first, so the word answers the first scroll
   without rushing at you; fast as it leaves.
 - **Held by CSS `sticky`, not `pin: true`.** The section is its full
-  height in the first HTML. A pin adds its height only when the script runs —
-  on a reload the browser restores the scroll to the shorter page, then the
-  pin pushes everything down, and the scene flashes by.
+  height in the first HTML. A pin adds its height only when the script
+  runs, after the browser has measured the page without it; the connector
+  puts a reload back in place, but the scene needs no putting back at all.
 - **One smoothing:** `scrub: true` with Lenis, `scrub: 1` without — see
   With Lenis, smooth once.
 - **Reduced motion:** the cover hidden, the section one screen tall — the

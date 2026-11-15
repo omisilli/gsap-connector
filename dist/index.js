@@ -21,7 +21,7 @@
  * scroll back on load; triggers made after that — behind an await, in a
  * React effect — add their pin spacing to a page the browser has already
  * measured, and the scroll comes up short. The connector puts it back
- * once the triggers are refreshed.
+ * once the triggers are refreshed — and a link to a #id the same way.
  *
  * With Lenis: Lenis runs on GSAP's ticker instead of its own loop, every
  * Lenis scroll updates ScrollTrigger, and lag smoothing is off, so the two
@@ -74,6 +74,10 @@ export function connectGsap({ gsap, ScrollTrigger, lenis, restoreScroll = true }
  * connection (React remounting, Lenis arriving later) does not put it back
  * a second time.
  *
+ * An address with a # on a first visit: the browser went to that element
+ * before the pins were in, so the element is put back at the top instead —
+ * where the browser meant it to be.
+ *
  * Put back after each full refresh until the page has loaded — that is
  * when the pin spacers are in, and ScrollTrigger refreshes on load itself,
  * after images have taken their height. It stops once the page has loaded,
@@ -81,21 +85,37 @@ export function connectGsap({ gsap, ScrollTrigger, lenis, restoreScroll = true }
  */
 const SCROLL_KEY = "pg-gsap-connector-scroll:";
 const USER_SCROLLS = ["wheel", "touchstart", "keydown", "pointerdown"];
+// A scroll position, or the element of the address's #.
 let wanted; // undefined: not read yet
 function readScroll(key) {
     const nav = performance.getEntriesByType?.("navigation")[0];
-    if (nav?.type !== "reload" && nav?.type !== "back_forward")
-        return null;
-    // An address with a #: the browser, or the page, goes there instead.
-    if (location.hash)
+    // A reload, or back and forward: where the page was left — # or not,
+    // as the browser does itself.
+    if (nav?.type === "reload" || nav?.type === "back_forward") {
+        try {
+            const value = Number(sessionStorage.getItem(key));
+            if (value > 0)
+                return value;
+        }
+        catch { } // storage blocked: the # below, if there is one
+    }
+    if (!location.hash)
         return null;
     try {
-        const value = Number(sessionStorage.getItem(key));
-        return value > 0 ? value : null;
+        return document.getElementById(decodeURIComponent(location.hash.slice(1)));
     }
     catch {
-        return null; // storage blocked: the browser's own restore only
+        return null; // a # that is not an id
     }
+}
+/* Where the browser puts an element it scrolls to: its top at the top of
+   the screen, less its scroll-margin and the page's scroll-padding. */
+function topOf(element) {
+    const px = (value) => parseFloat(value) || 0;
+    return (element.getBoundingClientRect().top +
+        window.scrollY -
+        px(getComputedStyle(element).scrollMarginTop) -
+        px(getComputedStyle(document.documentElement).scrollPaddingTop));
 }
 function rememberScroll(ScrollTrigger, lenis) {
     // Lenis inside a box of its own: the page's scroll is not its scroll.
@@ -119,14 +139,21 @@ function rememberScroll(ScrollTrigger, lenis) {
     const put = () => {
         if (wanted == null)
             return detach();
-        if (Math.abs(window.scrollY - wanted) > 1) {
+        if (typeof wanted !== "number") {
+            // Hidden — in a closed tab, say — or already on its way there
+            // with Lenis: the page's own anchor code has it; leave it.
+            if (wanted.getClientRects().length === 0 || lenis?.isScrolling === "smooth")
+                return settle();
+        }
+        const top = typeof wanted === "number" ? wanted : topOf(wanted);
+        if (Math.abs(window.scrollY - top) > 1) {
             if (lenis) {
                 // Lenis still holds the page's height from before the pins.
                 lenis.resize();
-                lenis.scrollTo(wanted, { immediate: true, force: true });
+                lenis.scrollTo(top, { immediate: true, force: true });
             }
             else {
-                window.scrollTo({ top: wanted, behavior: "instant" });
+                window.scrollTo({ top, behavior: "instant" });
             }
         }
         if (document.readyState === "complete")

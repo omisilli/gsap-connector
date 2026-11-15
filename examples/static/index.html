@@ -10,7 +10,7 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>gsap-connector — example</title>
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/index.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.1/index.css" />
         <!-- Only takes effect with Lenis: it styles html.lenis. -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css" />
         <style>
@@ -163,15 +163,19 @@
             }
 
             /*
-             * Recipe — a word that opens onto a picture. The section is 325svh
-             * tall from the first HTML; the stage sticks to the top while
-             * the 225svh below it scroll by — the scene. CSS sticky, not
+             * Recipe — a word that opens onto a picture. The section is one
+             * screen plus the scene tall from the first HTML; the stage
+             * sticks to the top while the scene scrolls by. CSS sticky, not
              * GSAP's pin: a pin adds its height only once the script runs,
-             * so a reload restores the scroll to the shorter page and then
-             * jumps.
+             * and the browser has measured the page without it by then.
+             *
+             * --pg-gsap-connector-reveal-length: the scene — how far the page
+             * scrolls while the word grows and leaves. Shorter is faster.
+             * Set on the section or any parent; a breakpoint can set its
+             * own. Not set: 225svh.
              */
             .pg-gsap-connector-reveal {
-                height: 325svh;
+                height: calc(100svh + var(--pg-gsap-connector-reveal-length, 225svh));
                 background: #000;
             }
             /* The stage: the photo, and over it a dark cover with the word
@@ -313,6 +317,15 @@
                     <a id="play-always" href="?">Every time</a>
                     <a id="play-once" href="?once">Only the first time</a>
                 </div>
+                <p>
+                    How fast: the scroll the scene takes, <code>--pg-gsap-connector-reveal-length</code> in the CSS —
+                    225svh by default, a little over two screens. Shorter is faster.
+                </p>
+                <div class="row">
+                    <a id="length-225" href="?">225svh</a>
+                    <a id="length-150" href="?length=150">150svh</a>
+                    <a id="length-100" href="?length=100">100svh</a>
+                </div>
             </section>
         </main>
 
@@ -324,11 +337,14 @@
                 <div class="pg-gsap-connector-reveal-cover" aria-hidden="true"><span class="pg-gsap-connector-reveal-word">AUDI</span></div>
             </div>
         </section>
-        <!-- The example's switch, ?once: the setting, written as the HTML is read. -->
+        <!-- The example's switches, ?once and ?length: the settings, written
+             as the HTML is read. -->
         <script>
-            if (new URLSearchParams(location.search).has("once")) {
-                document.currentScript.previousElementSibling.setAttribute("data-pg-gsap-connector-reveal", "once");
-            }
+            (function (scene, query) {
+                if (query.has("once")) scene.setAttribute("data-pg-gsap-connector-reveal", "once");
+                var length = query.get("length");
+                if (length && /^\d+$/.test(length)) scene.style.setProperty("--pg-gsap-connector-reveal-length", length + "svh");
+            })(document.currentScript.previousElementSibling, new URLSearchParams(location.search));
         </script>
         <!-- The recipe's early part, right after the section: played already in
              this tab, it is one screen tall before the page is drawn — so a
@@ -356,7 +372,7 @@
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
         <script type="module">
-            import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/dist/index.js";
+            import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.1/dist/index.js";
 
             const { gsap, ScrollTrigger } = window;
             gsap.registerPlugin(ScrollTrigger);
@@ -470,9 +486,9 @@
             document.getElementById("shrink").addEventListener("click", () => grown.lastElementChild?.remove());
 
             // The switches — each link keeps the others — and what is running.
-            const link = (name, on) => {
+            const link = (name, on, value = "") => {
                 const next = new URLSearchParams(query);
-                if (on) next.set(name, "");
+                if (on) next.set(name, value);
                 else next.delete(name);
                 return `?${next.toString().replace(/=(&|$)/g, "$1")}`;
             };
@@ -489,6 +505,11 @@
                     sessionStorage.removeItem(playedKey);
                 } catch {}
             });
+            // The scene's length; 225svh, the CSS's own, is no setting at all.
+            for (const length of ["225", "150", "100"]) {
+                document.getElementById(`length-${length}`).href = link("length", length !== "225", length);
+            }
+            document.getElementById(`length-${query.get("length") ?? "225"}`)?.setAttribute("aria-current", "true");
             const off = document.getElementById("connector-off");
             off.href = link("off", connected);
             off.textContent = connected ? "Without the connector" : "With the connector";
