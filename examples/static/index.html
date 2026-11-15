@@ -162,33 +162,59 @@
             }
 
             /*
-             * Recipe — a word that opens onto a picture. The section is four
-             * screens tall from the first HTML; the stage sticks to the top
-             * while the three screens below it scroll by. CSS sticky, not
+             * Recipe — a word that opens onto a picture. The section is 325svh
+             * tall from the first HTML; the stage sticks to the top while
+             * the 225svh below it scroll by — the scene. CSS sticky, not
              * GSAP's pin: a pin adds its height only once the script runs,
              * so a reload restores the scroll to the shorter page and then
              * jumps.
              */
             .reveal {
-                height: 400svh;
+                height: 325svh;
                 background: #0d0d0f;
             }
+            /* The stage: the photo, and over it a dark cover with the word
+               in white. The cover blends "darken": white keeps the photo,
+               the dark keeps the dark — the photo shows through the letters.
+               isolation keeps the blend to the stage. */
             .reveal-stage {
                 position: sticky;
                 top: 0;
                 height: 100svh;
                 overflow: clip;
+                display: grid;
+                isolation: isolate;
             }
-            .reveal svg {
+            .reveal-stage > * {
+                grid-area: 1 / 1;
+            }
+            .reveal-stage img {
                 display: block;
                 width: 100%;
                 height: 100%;
+                object-fit: cover;
             }
-            /* The word, white in the mask: the picture shows through it. */
-            #reveal-word {
+            .reveal-cover {
+                display: grid;
+                place-items: center;
+                background: #0d0d0f;
+                mix-blend-mode: darken;
+            }
+            /* The word.
+               --pg-gsap-connector-reveal-origin: the point it grows from, as fractions of the
+               word — set for the word, in its font. Put it in the middle of
+               a stroke near the centre: that stroke grows over the whole
+               screen and the picture opens out of the letter itself, nothing
+               sliding aside. For AUDI here, the right leg of the U (49.7–58.1%
+               across): 54%. Another word, font or letter-spacing — another
+               value; a breakpoint can set its own. Not set: the middle. */
+            .reveal-word {
+                --pg-gsap-connector-reveal-origin: 54% 50%;
                 font: 900 min(28vw, 45svh) / 1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
                 letter-spacing: -0.03em;
-                fill: #fff;
+                white-space: nowrap;
+                color: #fff;
+                transform-origin: var(--pg-gsap-connector-reveal-origin, 50% 50%);
             }
             /* Reduced motion: the picture, open, one screen tall. */
             @media (prefers-reduced-motion: reduce) {
@@ -268,27 +294,25 @@
                 <h2>Recipe — a word that opens onto a picture</h2>
                 <p>
                     No package of its own: plain GSAP, a few lines below. The picture shows only through the
-                    letters; as the scroll goes on the word comes at you from its middle and leaves the screen, the
-                    picture opening as it goes — then the picture stays whole a while, and the page scrolls on. Scroll back, and it closes again.
+                    letters; as the scroll goes on the word comes at you from inside the U and leaves the screen,
+                    the picture opening out of the letter — and the moment the picture is whole, the page scrolls on.
+                    Every time: scroll back, and it closes again. Only the first time: once open, it stays open —
+                    <code>data-pg-gsap-connector-reveal="once"</code> on the section.
                 </p>
+                <div class="row">
+                    <button type="button" data-play="always">Every time</button>
+                    <button type="button" data-play="once">Only the first time</button>
+                </div>
             </section>
             <div class="space"></div>
         </main>
 
-        <!-- The recipe: an SVG the size of the screen, the photo masked by the
-             word. The mask's white shows the photo, its black hides it. -->
+        <!-- The recipe: the photo, and a dark cover with the word in white
+             over it, blended — the photo shows through the letters. -->
         <section class="reveal" id="reveal">
             <div class="reveal-stage">
-                <svg role="img" aria-label="AUDI — a car, seen through the letters">
-                    <defs>
-                        <mask id="reveal-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
-                            <!-- At the end, the whole mask white: the photo whole. -->
-                            <rect id="reveal-open" width="100%" height="100%" fill="#fff" opacity="0" />
-                            <text id="reveal-word" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">AUDI</text>
-                        </mask>
-                    </defs>
-                    <image href="./media/car.avif" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask="url(#reveal-mask)" />
-                </svg>
+                <img src="./media/car.avif" alt="AUDI — a car, seen through the letters" />
+                <div class="reveal-cover" aria-hidden="true"><span class="reveal-word">AUDI</span></div>
             </div>
         </section>
 
@@ -349,24 +373,68 @@
                 },
             });
 
-            // Recipe — a word that opens onto a picture, in three parts of the
-            // scroll: the word grows from its middle and leaves the screen
-            // (0–0.75); as it does, the mask's white fades in, so the gap
-            // between its letters opens onto the picture too (0.45–0.75); then
-            // the picture stays whole (0.75–1) until the section scrolls on.
+            // Recipe — a word that opens onto a picture: the word grows from
+            // the point its CSS gives (--pg-gsap-connector-reveal-origin) until
+            // its stroke covers the screen; only at the end (0.85–1) does the
+            // cover fade — for a word whose point sits on a gap, so nothing
+            // half-dark slides across. The timeline ends as the picture is
+            // whole, and the section scrolls on at once — no hold.
             // One smoothing: Lenis glides already; without it, scrub: 1 does.
-            if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-                gsap.set("#reveal-open", { opacity: 1 });
-            } else {
-                gsap.timeline({
-                    scrollTrigger: { trigger: "#reveal", start: "top top", end: "bottom bottom", scrub: lenis ? true : 1 },
-                })
-                    // "50% 50%": from the middle, whatever the word. "40% 50%"
-                    // leans it to the right, "60% 50%" to the left.
-                    .fromTo("#reveal-word", { scale: 1 }, { scale: 30, transformOrigin: "50% 50%", ease: "power2.in", duration: 0.75 }, 0)
-                    .fromTo("#reveal-open", { opacity: 0 }, { opacity: 1, ease: "power1.inOut", duration: 0.3 }, 0.45)
-                    .set({}, {}, 1); // the last quarter: the picture, whole
-            }
+            //
+            // data-pg-gsap-connector-reveal="once" on the section: once the picture is whole the
+            // scene lets go of the scroll and stays open — scroll back, the
+            // picture is there. Not set: every time, both ways.
+            const PLAY = "data-pg-gsap-connector-reveal";
+            const reveal = document.getElementById("reveal");
+            let scene = null;
+            const playReveal = () => {
+                // The switch below builds it again: the old one goes first.
+                scene?.scrollTrigger?.kill();
+                scene?.kill();
+                gsap.set([".reveal-word", ".reveal-cover"], { clearProps: "transform,opacity,visibility" });
+                if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                    gsap.set(".reveal-cover", { autoAlpha: 0 });
+                    return;
+                }
+                const once = reveal.getAttribute(PLAY) === "once";
+                // Whole: the trigger goes, the timeline stays — finished.
+                // st.animation, not scene: on a reload below the section the
+                // first refresh comes while the timeline is still being made.
+                const stayOpen = (st) => {
+                    if (st.progress < 0.99) return;
+                    const timeline = st.animation;
+                    st.kill(false, true);
+                    gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
+                };
+                scene = gsap
+                    .timeline({
+                        scrollTrigger: {
+                            trigger: reveal,
+                            start: "top top",
+                            end: "bottom bottom",
+                            scrub: lenis ? true : 1,
+                            onUpdate: once ? stayOpen : undefined,
+                            onRefresh: once ? stayOpen : undefined, // a reload below it
+                        },
+                    })
+                    .fromTo(".reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
+                    .fromTo(".reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
+            };
+            playReveal();
+
+            // The switch: every time, or only the first time.
+            const plays = document.querySelectorAll("[data-play]");
+            const markPlay = () =>
+                plays.forEach((b) => b.setAttribute("aria-current", String(b.dataset.play === (reveal.getAttribute(PLAY) || "always"))));
+            plays.forEach((b) =>
+                b.addEventListener("click", () => {
+                    if (b.dataset.play === "once") reveal.setAttribute(PLAY, "once");
+                    else reveal.removeAttribute(PLAY);
+                    markPlay();
+                    playReveal();
+                }),
+            );
+            markPlay();
 
             // The page grows: late content above the card.
             const grown = document.getElementById("grown");

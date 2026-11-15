@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -103,63 +103,96 @@ export function PinnedStrip() {
 
 /*
  * Recipe — a word that opens onto a picture (see the README). The section
- * is four screens tall from the server's HTML and its stage sticks: CSS
- * sticky, not pin, so a reload lands where it should. The word grows from
- * its middle and leaves the screen while the mask's white fades in; the
- * last quarter holds the picture whole, then the section scrolls on.
+ * is 325svh tall from the server's HTML and its stage sticks: CSS
+ * sticky, not pin, so a reload lands where it should. Over the photo, a
+ * dark cover with the word in white, blended "darken": the photo shows
+ * through the letters. The word grows from its
+ * --pg-gsap-connector-reveal-origin until its stroke covers the screen;
+ * at the end the cover fades, for a word whose point sits on a gap; the
+ * moment the picture is whole, the section scrolls on.
+ *
+ * origin: the point the word grows from, as fractions of the word. Put it
+ * in the middle of a stroke near the centre — that stroke grows over the
+ * screen and the picture opens out of the letter; for AUDI in this font,
+ * the right leg of the U: "54% 50%". Another word or font, another value.
+ * It is passed on as --pg-gsap-connector-reveal-origin, so a stylesheet
+ * may set its own per breakpoint instead.
+ *
+ * once: only the first time — once the picture is whole the scene lets go
+ * of the scroll and stays open. Off (the default): every time, both ways.
  */
-export function WordReveal({ src, word = "AUDI", label }: { src: string; word?: string; label: string }) {
+export function WordReveal({
+    src,
+    word = "AUDI",
+    origin = "54% 50%",
+    once = false,
+    label,
+}: {
+    src: string;
+    word?: string;
+    origin?: string;
+    once?: boolean;
+    label: string;
+}) {
     const section = useRef<HTMLElement>(null);
     const lenis = useLenis();
-    const mask = `reveal-${useId().replace(/:/g, "")}`; // one mask per scene
 
     useGSAP(
         () => {
             if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-                gsap.set(".reveal-open", { opacity: 1 });
+                gsap.set(".reveal-cover", { autoAlpha: 0 });
                 return;
             }
+            // Whole: the trigger goes, the timeline stays — finished.
+            const stayOpen = (st: ScrollTrigger) => {
+                if (st.progress < 0.99) return;
+                const timeline = st.animation;
+                st.kill(false, true);
+                gsap.to(timeline!, { progress: 1, duration: 0.4, ease: "power1.out" });
+            };
             gsap.timeline({
                 scrollTrigger: {
                     trigger: section.current,
                     start: "top top",
                     end: "bottom bottom",
                     scrub: lenis ? true : 1, // one smoothing
+                    onUpdate: once ? stayOpen : undefined,
+                    onRefresh: once ? stayOpen : undefined, // a reload below it
                 },
             })
-                // "50% 50%": from the middle, whatever the word. "40% 50%"
-                // leans it to the right, "60% 50%" to the left.
-                .fromTo(".reveal-word", { scale: 1 }, { scale: 30, transformOrigin: "50% 50%", ease: "power2.in", duration: 0.75 }, 0)
-                .fromTo(".reveal-open", { opacity: 0 }, { opacity: 1, ease: "power1.inOut", duration: 0.3 }, 0.45)
-                .set({}, {}, 1); // the last quarter: the picture, whole
+                .fromTo(".reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
+                .fromTo(".reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
         },
-        { scope: section, dependencies: [lenis, word] },
+        { scope: section, dependencies: [lenis, word, origin, once], revertOnUpdate: true },
     );
 
+    const layer: CSSProperties = { gridArea: "1 / 1" };
     return (
-        <section ref={section} style={{ height: "400svh", background: "#0d0d0f" }}>
-            <div style={{ position: "sticky", top: 0, height: "100svh", overflow: "clip" }}>
-                <svg role="img" aria-label={label} style={{ display: "block", width: "100%", height: "100%" }}>
-                    <defs>
-                        <mask id={mask} maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
-                            <rect className="reveal-open" width="100%" height="100%" fill="#fff" opacity={0} />
-                            <text
-                                className="reveal-word"
-                                x="50%"
-                                y="50%"
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fill="#fff"
-                                style={{ font: "900 min(28vw, 45svh) / 1 system-ui, sans-serif", letterSpacing: "-0.03em" }}
-                            >
-                                {word}
-                            </text>
-                        </mask>
-                    </defs>
-                    <image href={src} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask={`url(#${mask})`} />
-                </svg>
+        <section ref={section} style={{ height: "325svh", background: "#0d0d0f" }}>
+            <div style={{ position: "sticky", top: 0, height: "100svh", overflow: "clip", display: "grid", isolation: "isolate" }}>
+                <img src={src} alt={label} style={{ ...layer, display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
+                <div
+                    className="reveal-cover"
+                    aria-hidden="true"
+                    style={{ ...layer, display: "grid", placeItems: "center", background: "#0d0d0f", mixBlendMode: "darken" }}
+                >
+                    <span
+                        className="reveal-word"
+                        style={
+                            {
+                                "--pg-gsap-connector-reveal-origin": origin,
+                                font: "900 min(28vw, 45svh) / 1 system-ui, sans-serif",
+                                letterSpacing: "-0.03em",
+                                whiteSpace: "nowrap",
+                                color: "#fff",
+                                transformOrigin: "var(--pg-gsap-connector-reveal-origin, 50% 50%)",
+                            } as CSSProperties
+                        }
+                    >
+                        {word}
+                    </span>
+                </div>
             </div>
         </section>
     );
 }
-

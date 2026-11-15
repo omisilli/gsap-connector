@@ -180,80 +180,131 @@ each. The connector only keeps them in step with the scroll, Lenis or not.
 ### A word that opens onto a picture
 
 The picture shows only through the letters of a word. As the page scrolls
-the word comes at you from its middle and leaves the screen, the picture
-opening as it goes; then the picture stays whole a while, and the page
-scrolls on. Scroll back and it closes into the word again.
+the word comes at you — from inside one of its letters — and leaves the
+screen, the picture opening out of that letter; the moment the picture is
+whole, the page scrolls on. Every time, by default: scroll back and it
+closes into the word again. Or only the first time:
+`data-pg-gsap-connector-reveal="once"` on the section, and once open it
+stays open.
 
 ```html
-<section class="reveal">
+<section class="reveal">  <!-- data-pg-gsap-connector-reveal="once": only the first time -->
     <div class="reveal-stage">
-        <svg role="img" aria-label="…">
-            <defs>
-                <mask id="reveal-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
-                    <rect id="reveal-open" width="100%" height="100%" fill="#fff" opacity="0" />
-                    <text id="reveal-word" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">AUDI</text>
-                </mask>
-            </defs>
-            <image href="car.avif" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask="url(#reveal-mask)" />
-        </svg>
+        <img src="car.avif" alt="AUDI — a car, seen through the letters" />
+        <div class="reveal-cover" aria-hidden="true"><span class="reveal-word">AUDI</span></div>
     </div>
 </section>
 ```
 
 ```css
-.reveal { height: 400svh; background: #0d0d0f; }          /* four screens */
-.reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; }
-.reveal svg { display: block; width: 100%; height: 100%; }
-#reveal-word { font: 900 min(28vw, 45svh) / 1 system-ui, sans-serif; fill: #fff; }
+.reveal { height: 325svh; background: #0d0d0f; }          /* the scene: 225svh of scroll */
+.reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; display: grid; isolation: isolate; }
+.reveal-stage > * { grid-area: 1 / 1; }
+.reveal-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.reveal-cover { display: grid; place-items: center; background: #0d0d0f; mix-blend-mode: darken; }
+/* --pg-gsap-connector-reveal-origin: the point the word grows from, as fractions of the word.
+   The middle of a stroke near the centre — for AUDI in this font, the right
+   leg of the U (49.7–58.1% across): 54%. Set it for your word and font;
+   not set, the middle. */
+.reveal-word {
+    --pg-gsap-connector-reveal-origin: 54% 50%;
+    font: 900 min(28vw, 45svh) / 1 system-ui, sans-serif;
+    letter-spacing: -0.03em;
+    white-space: nowrap;
+    color: #fff;
+    transform-origin: var(--pg-gsap-connector-reveal-origin, 50% 50%);
+}
 @media (prefers-reduced-motion: reduce) { .reveal { height: auto; } }
 ```
 
 ```js
+const reveal = document.querySelector(".reveal");
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    gsap.set("#reveal-open", { opacity: 1 }); // the picture, open
+    gsap.set(".reveal-cover", { autoAlpha: 0 }); // the picture, open
 } else {
+    const once = reveal.getAttribute("data-pg-gsap-connector-reveal") === "once";
+    // Once: when the picture is whole, the trigger goes and the timeline
+    // stays, finished. st.animation — on a reload below the section the
+    // first refresh comes while the timeline is still being made.
+    const stayOpen = (st) => {
+        if (st.progress < 0.99) return;
+        const timeline = st.animation;
+        st.kill(false, true);
+        gsap.to(timeline, { progress: 1, duration: 0.4, ease: "power1.out" });
+    };
     gsap.timeline({
-        scrollTrigger: { trigger: ".reveal", start: "top top", end: "bottom bottom", scrub: lenis ? true : 1 },
+        scrollTrigger: {
+            trigger: reveal,
+            start: "top top",
+            end: "bottom bottom",
+            scrub: lenis ? true : 1,
+            onUpdate: once ? stayOpen : undefined,
+            onRefresh: once ? stayOpen : undefined,
+        },
     })
-        // 0 – 0.75: the word grows from its middle, out of the screen
-        .fromTo("#reveal-word", { scale: 1 }, { scale: 30, transformOrigin: "50% 50%", ease: "power2.in", duration: 0.75 }, 0)
-        // 0.45 – 0.75: the mask's white comes in — the gaps open too
-        .fromTo("#reveal-open", { opacity: 0 }, { opacity: 1, ease: "power1.inOut", duration: 0.3 }, 0.45)
-        // 0.75 – 1: the picture, whole
-        .set({}, {}, 1);
+        // the word grows from its point, out of the screen
+        .fromTo(".reveal-word", { scale: 1 }, { scale: 60, ease: "power3.in", duration: 1 }, 0)
+        // 0.85 – 1: the stroke covers the screen by now; the cover fades for
+        // a word whose point sits on a gap — and the scene ends, whole
+        .fromTo(".reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
 }
 ```
 
-- **An SVG mask, not CSS `mask-image`.** White in the mask shows the
-  picture, black hides it. The word is real text in the SVG — any font the
-  page has, any word, no image of it to make — and it needs no `-webkit-`
-  prefix anywhere.
-- **From the middle, whatever the word.** `transformOrigin: "50% 50%"`
-  needs nothing measured: change the word, the font or the language and it
-  still grows from its centre.
-- **The gaps open too.** Grown from its middle, a word may well end on the
-  space between two letters — a dark screen. So, as the word leaves, the
-  mask's white rectangle fades in: whatever is still dark opens onto the
-  picture, and by three quarters of the way the picture is whole, on any
-  word and any screen.
-- **It holds, then scrolls on.** The last quarter of the timeline is empty
-  (`.set({}, {}, 1)`): the picture stays whole, sticky, while the scroll
-  goes on — then the section ends and the page carries it away. Change the
-  `0.75`s to give the hold more or less of the scroll; make the section
-  taller for a longer scene.
-- **Leaning one way (optional).** `"40% 50%"` grows the word more to the
-  right, `"60% 50%"` more to the left — for a design that wants it. Leave it
-  at `"50% 50%"` otherwise.
-- **`power2.in`:** slow at first, so the word answers the first scroll
+- **A dark cover blended `darken`, not an SVG mask.** The cover is the
+  section's dark with the word in white; `darken` keeps the darker of the
+  two — the dark around the letters, the photo inside them. The word is
+  real text — any font the page has, any word, no image of it to make.
+  An SVG `<mask>` looks like the obvious tool, but sixty times its size a
+  word in a mask is drawn wrong by the GPU — dark bands across the screen,
+  sooner on a Retina display — while a scaled element is drawn in tiles,
+  only what is on screen. `isolation: isolate` keeps the blend to the stage.
+- **Where it grows from: `--pg-gsap-connector-reveal-origin`, set for the word.** Grown from
+  its exact middle, a word ends wherever its middle happens to fall — on
+  the edge of a letter, and that edge, a pixel off the centre, slides
+  aside sixty times over; or in a gap, and the screen goes dark. So the
+  point is a design choice, made in the CSS beside the word's font: the
+  middle of a stroke near the centre. That stroke grows over the whole
+  screen from where it stands — the picture opens out of the letter,
+  nothing slides. To find it, look at the word across its middle: in AUDI
+  (this font, `-0.03em`), the right leg of the U runs from 49.7% to 58.1%
+  of the word — `54% 50%`. A different word, font, weight or
+  letter-spacing moves the strokes: set it again. It is plain
+  `transform-origin`, so a breakpoint that changes the font sets its own,
+  and the script needs to know nothing. Leaning it — like a brand that
+  grows from one letter on purpose — is the same setting.
+- **First the stroke, then the fade.** Grown sixty times, a stroke a
+  twelfth of the word wide covers the screen by about 0.75 of the scene
+  on a 16:10 screen, 0.85 on a very wide one. Only then, 0.85 – 1, does
+  the cover fade — with the point set well there is nothing left to fade,
+  and nothing half-dark slides across while the word still grows. It is
+  there for the word whose point sits on a gap, or is not set: whatever is
+  still dark opens onto the picture, and at the end of the scene the
+  picture is whole, on any word and any screen. `autoAlpha` ends it
+  `visibility: hidden` — nothing drawn over the picture.
+- **Whole, then it scrolls on — no hold.** The timeline ends as the
+  picture is whole, at the section's `bottom bottom`: the very next scroll
+  carries the picture away with the section. For a slower scene make the
+  section taller; for a hold, an empty stretch at the end of the timeline
+  (`.set({}, {}, 1.2)`) keeps it whole a while.
+- **Every time, or only the first time.** By default the scene is tied to
+  the scroll both ways: scroll back up and the picture closes into the
+  word again. `data-pg-gsap-connector-reveal="once"` plays it the first
+  time only — when the
+  picture is whole, `kill(false, true)` removes the trigger but keeps the
+  timeline, and a short tween takes it to its end: from then on the
+  picture is open, whichever way the page scrolls. `onRefresh` covers a
+  reload below the section: the page opens there with the picture already
+  open. "The first time" is per page view — nothing is stored.
+- **`power3.in`:** slow at first, so the word answers the first scroll
   without rushing at you; fast as it leaves.
-- **Held by CSS `sticky`, not `pin: true`.** The section is four screens
-  tall in the first HTML. A pin adds its height only when the script runs —
+- **Held by CSS `sticky`, not `pin: true`.** The section is its full
+  height in the first HTML. A pin adds its height only when the script runs —
   on a reload the browser restores the scroll to the shorter page, then the
   pin pushes everything down, and the scene flashes by.
 - **One smoothing:** `scrub: true` with Lenis, `scrub: 1` without — see
   With Lenis, smooth once.
-- **Reduced motion:** the mask's white rectangle on, the section one screen
-  tall — the picture, open, at once.
+- **Reduced motion:** the cover hidden, the section one screen tall — the
+  picture, open, at once.
 
 ## From the old gsap folder
 
