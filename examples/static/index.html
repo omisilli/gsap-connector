@@ -304,6 +304,25 @@
                 </p>
             </section>
             <section>
+                <h2>A reload, or a link with a #, lands in the right place</h2>
+                <p>
+                    Reload the page down here: you are where you were. With Lenis, this page makes its triggers
+                    only after Lenis has loaded — after the page itself — so the pin adds its height to a page the
+                    browser has already measured, and the scroll would come back short by that height. The
+                    connector keeps the scroll for the tab and puts it back once the triggers are refreshed.
+                </p>
+                <p>
+                    An address with a <code>#</code> goes straight to its element — a link shared to the recipe
+                    below opens on the recipe, not a pin's height above it. Open it in a new tab; then the same
+                    without the connector, and see where it lands. A hidden element (a closed tab) is left to the
+                    page's own anchor code; <code>restoreScroll: false</code> turns all of this off.
+                </p>
+                <div class="row">
+                    <a id="hash-on" href="#reveal" target="_blank">Open #reveal in a new tab</a>
+                    <a id="hash-off" href="?off#reveal" target="_blank">The same, without the connector</a>
+                </div>
+            </section>
+            <section>
                 <h2>Recipe — a word that opens onto a picture</h2>
                 <p>
                     No package of its own: plain GSAP, a few lines below. The picture shows only through the
@@ -510,6 +529,9 @@
                 document.getElementById(`length-${length}`).href = link("length", length !== "225", length);
             }
             document.getElementById(`length-${query.get("length") ?? "225"}`)?.setAttribute("aria-current", "true");
+            // A shared link to the recipe: this page's switches, and #reveal.
+            document.getElementById("hash-on").href = `${link("off", false)}#reveal`;
+            document.getElementById("hash-off").href = `${link("off", true)}#reveal`;
             const off = document.getElementById("connector-off");
             off.href = link("off", connected);
             off.textContent = connected ? "Without the connector" : "With the connector";

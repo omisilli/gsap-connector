@@ -202,7 +202,8 @@ without it (`?nolenis`), and without the connector (`?off`), to see the
 difference: grow the page above the card and watch ScrollTrigger's markers
 follow it — or, without the connector, stay where they were. A card that
 widens as it scrolls through, a pinned section whose strip slides
-across, and the recipe — a word that opens onto a picture. Its photo is in
+across, a reload and a `#` link that land in the right place below it,
+and the recipe — a word that opens onto a picture. Its photo is in
 `examples/static/media/`.
 
 ## Recipes
