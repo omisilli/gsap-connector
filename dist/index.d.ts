@@ -9,20 +9,29 @@ export type GsapLike = {
 export type ScrollTriggerLike = {
     update(): unknown;
     refresh(): unknown;
+    addEventListener(type: "refresh", callback: () => void): unknown;
+    removeEventListener(type: "refresh", callback: () => void): unknown;
 };
 export type LenisLike = {
     on(event: "scroll", callback: () => void): unknown;
     off(event: "scroll", callback: () => void): unknown;
     raf(time: number): void;
+    resize(): void;
+    scrollTo(target: number, options?: {
+        immediate?: boolean;
+        force?: boolean;
+    }): void;
     destroy(): void;
     options: {
         autoRaf?: boolean;
+        wrapper?: unknown;
     };
 };
 export type GsapConnection = {
     gsap: GsapLike;
     ScrollTrigger: ScrollTriggerLike;
     lenis?: LenisLike | null;
+    restoreScroll?: boolean;
 };
-export declare function connectGsap({ gsap, ScrollTrigger, lenis }: GsapConnection): () => void;
+export declare function connectGsap({ gsap, ScrollTrigger, lenis, restoreScroll }: GsapConnection): () => void;
 export {};

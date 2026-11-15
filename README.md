@@ -1,8 +1,9 @@
 # gsap-connector
 
 GSAP's ScrollTrigger and the page, with or without Lenis — in one line. It
-refreshes the triggers when the page changes height, and, on a page with
-Lenis, runs Lenis on GSAP's ticker so the two never part. No dependencies.
+refreshes the triggers when the page changes height, brings a reload back
+to where the page was left, pins and all, and, on a page with Lenis, runs
+Lenis on GSAP's ticker so the two never part. No dependencies.
 
 > **GSAP is not in this package — install it yourself.** The connector
 > takes the GSAP your site already has: one copy on the page, the version
@@ -10,7 +11,7 @@ Lenis, runs Lenis on GSAP's ticker so the two never part. No dependencies.
 
 ```sh
 npm install gsap
-npm install github:omisilli/gsap-connector#v1.0.1
+npm install github:omisilli/gsap-connector#v1.1.0
 ```
 
 ```ts
@@ -33,11 +34,11 @@ added in a later release then reaches you with no new import line.
 ### Without a build step
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.1/index.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/index.css" />
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/ScrollTrigger.min.js"></script>
 <script type="module">
-    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.0.1/dist/index.js";
+    import { connectGsap } from "https://cdn.jsdelivr.net/gh/omisilli/gsap-connector@v1.1.0/dist/index.js";
 
     gsap.registerPlugin(ScrollTrigger);
     connectGsap({ gsap, ScrollTrigger });
@@ -68,6 +69,28 @@ ScrollTrigger when it changes, once a frame at most.
 
 With or without Lenis: ScrollTrigger reads the page's own scroll, which
 Lenis moves.
+
+### A reload lands where the page was left
+
+The browser puts the scroll back as the page loads. A pin adds its
+spacing only once its trigger is made — and a trigger made after the page
+has loaded (behind an `await`, in a React effect, in a chunk that comes
+later) adds it to a page the browser has already measured. The scroll
+comes back short by that spacing: below a pinned section, a reload lands
+higher than you were.
+
+The connector keeps the scroll for this tab, saved as the page goes. On a
+reload, or back and forward, it puts it back after the triggers are
+refreshed — until the page has loaded, then it lets go. It leaves the
+scroll alone when the visitor scrolls first, when the address has a `#`
+(the page goes there instead), on a first visit, and with a Lenis that
+scrolls a box of its own rather than the page.
+
+A site that keeps the scroll itself turns it off:
+
+```js
+connectGsap({ gsap, ScrollTrigger, lenis, restoreScroll: false });
+```
 
 ### Lenis on GSAP's clock
 
@@ -164,8 +187,8 @@ See [`examples/react/Example.tsx`](examples/react/Example.tsx).
 
 ## Example
 
-[`examples/static/index.html`](examples/static/index.html) — with or without
-Lenis (`?lenis`), and without the connector (`?off`), to see the
+[`examples/static/index.html`](examples/static/index.html) — with Lenis, or
+without it (`?nolenis`), and without the connector (`?off`), to see the
 difference: grow the page above the card and watch ScrollTrigger's markers
 follow it — or, without the connector, stay where they were. A card that
 widens as it scrolls through, a pinned section whose strip slides

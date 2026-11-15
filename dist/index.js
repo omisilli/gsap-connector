@@ -17,6 +17,12 @@
  * content that arrives late, an image, an accordion — not only on load and
  * resize, as ScrollTrigger does by itself.
  *
+ * Always: a reload lands where the page was left. The browser puts the
+ * scroll back on load; triggers made after that — behind an await, in a
+ * React effect — add their pin spacing to a page the browser has already
+ * measured, and the scroll comes up short. The connector puts it back
+ * once the triggers are refreshed.
+ *
  * With Lenis: Lenis runs on GSAP's ticker instead of its own loop, every
  * Lenis scroll updates ScrollTrigger, and lag smoothing is off, so the two
  * never part. Disconnected, Lenis gets its own loop back.
@@ -32,7 +38,7 @@ const LAG_ADJUSTED = 33;
    newer one. Same rule as the other packages. */
 let live = null;
 /* Connect; returns the cleanup, for a React effect. */
-export function connectGsap({ gsap, ScrollTrigger, lenis }) {
+export function connectGsap({ gsap, ScrollTrigger, lenis, restoreScroll = true }) {
     if (typeof document === "undefined")
         return () => { };
     live?.();
@@ -46,6 +52,7 @@ export function connectGsap({ gsap, ScrollTrigger, lenis }) {
     const ro = new ResizeObserver(refresh);
     ro.observe(document.body);
     const unlinkLenis = lenis ? linkLenis(gsap, ScrollTrigger, lenis) : null;
+    const stopMemory = restoreScroll ? rememberScroll(ScrollTrigger, lenis ?? null) : null;
     let ended = false;
     const end = () => {
         if (ended)
@@ -53,12 +60,94 @@ export function connectGsap({ gsap, ScrollTrigger, lenis }) {
         ended = true;
         ro.disconnect();
         cancelAnimationFrame(frame);
+        stopMemory?.();
         unlinkLenis?.();
         if (live === end)
             live = null;
     };
     live = end;
     return end;
+}
+/*
+ * The scroll, kept across a reload — for this tab and this address. It is
+ * saved as the page goes, and read back once per page load: a second
+ * connection (React remounting, Lenis arriving later) does not put it back
+ * a second time.
+ *
+ * Put back after each full refresh until the page has loaded — that is
+ * when the pin spacers are in, and ScrollTrigger refreshes on load itself,
+ * after images have taken their height. It stops once the page has loaded,
+ * or as soon as the visitor scrolls: theirs wins.
+ */
+const SCROLL_KEY = "pg-gsap-connector-scroll:";
+const USER_SCROLLS = ["wheel", "touchstart", "keydown", "pointerdown"];
+let wanted; // undefined: not read yet
+function readScroll(key) {
+    const nav = performance.getEntriesByType?.("navigation")[0];
+    if (nav?.type !== "reload" && nav?.type !== "back_forward")
+        return null;
+    // An address with a #: the browser, or the page, goes there instead.
+    if (location.hash)
+        return null;
+    try {
+        const value = Number(sessionStorage.getItem(key));
+        return value > 0 ? value : null;
+    }
+    catch {
+        return null; // storage blocked: the browser's own restore only
+    }
+}
+function rememberScroll(ScrollTrigger, lenis) {
+    // Lenis inside a box of its own: the page's scroll is not its scroll.
+    if (lenis && lenis.options.wrapper !== undefined && lenis.options.wrapper !== window)
+        return null;
+    const key = SCROLL_KEY + location.pathname + location.search;
+    const save = () => {
+        try {
+            sessionStorage.setItem(key, String(Math.round(window.scrollY)));
+        }
+        catch { }
+    };
+    addEventListener("pagehide", save);
+    if (wanted === undefined)
+        wanted = readScroll(key);
+    // Done for this page load: put back, or given up.
+    const settle = () => {
+        wanted = null;
+        detach();
+    };
+    const put = () => {
+        if (wanted == null)
+            return detach();
+        if (Math.abs(window.scrollY - wanted) > 1) {
+            if (lenis) {
+                // Lenis still holds the page's height from before the pins.
+                lenis.resize();
+                lenis.scrollTo(wanted, { immediate: true, force: true });
+            }
+            else {
+                window.scrollTo({ top: wanted, behavior: "instant" });
+            }
+        }
+        if (document.readyState === "complete")
+            settle();
+    };
+    // Listeners only: a connection that ends early leaves the wanted scroll
+    // to the next one.
+    const detach = () => {
+        ScrollTrigger.removeEventListener("refresh", put);
+        for (const type of USER_SCROLLS)
+            removeEventListener(type, settle, true);
+    };
+    if (wanted != null) {
+        ScrollTrigger.addEventListener("refresh", put);
+        for (const type of USER_SCROLLS)
+            addEventListener(type, settle, { capture: true, passive: true });
+    }
+    return () => {
+        detach();
+        removeEventListener("pagehide", save);
+    };
 }
 /*
  * Lenis on GSAP's clock. Its own loop is switched off, not left running
