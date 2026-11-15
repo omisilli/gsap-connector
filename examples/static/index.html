@@ -2,7 +2,8 @@
 <!-- Open by double-clicking: everything loads from jsDelivr, not from ../..
      Pinned to this release, so the page and the code always match.
      ?lenis: the same page with Lenis. ?off: without the connector, to see
-     what it does. -->
+     what it does. The recipe at the end is plain GSAP — no package of its
+     own; its photo sits beside this file, in media/. -->
 <html lang="en">
     <head>
         <meta charset="utf-8" />
@@ -159,6 +160,42 @@
                 font-size: 2rem;
                 color: var(--muted);
             }
+
+            /*
+             * Recipe — a word that opens onto a picture. The section is four
+             * screens tall from the first HTML; the stage sticks to the top
+             * while the three screens below it scroll by. CSS sticky, not
+             * GSAP's pin: a pin adds its height only once the script runs,
+             * so a reload restores the scroll to the shorter page and then
+             * jumps.
+             */
+            .reveal {
+                height: 400svh;
+                background: #0d0d0f;
+            }
+            .reveal-stage {
+                position: sticky;
+                top: 0;
+                height: 100svh;
+                overflow: clip;
+            }
+            .reveal svg {
+                display: block;
+                width: 100%;
+                height: 100%;
+            }
+            /* The word, white in the mask: the picture shows through it. */
+            #reveal-word {
+                font: 900 min(28vw, 45svh) / 1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                letter-spacing: -0.03em;
+                fill: #fff;
+            }
+            /* Reduced motion: the picture, open, one screen tall. */
+            @media (prefers-reduced-motion: reduce) {
+                .reveal {
+                    height: auto;
+                }
+            }
         </style>
     </head>
     <body>
@@ -227,6 +264,39 @@
                     by the scroll. Pinning adds height to the page; the connector refreshes the triggers after it.
                 </p>
             </section>
+            <section>
+                <h2>Recipe — a word that opens onto a picture</h2>
+                <p>
+                    No package of its own: plain GSAP, a few lines below. The picture shows only through the
+                    letters; as the scroll goes on the word comes at you, from the stroke nearest its middle, until
+                    the picture fills the screen. Scroll back, and it closes again.
+                </p>
+            </section>
+            <div class="space"></div>
+        </main>
+
+        <!-- The recipe: an SVG the size of the screen, the photo masked by the
+             word. The mask's white shows the photo, its black hides it. -->
+        <section class="reveal" id="reveal">
+            <div class="reveal-stage">
+                <svg role="img" aria-label="AUDI — a car, seen through the letters">
+                    <defs>
+                        <mask id="reveal-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+                            <!-- At the end, the whole mask white: the photo whole. -->
+                            <rect id="reveal-open" width="100%" height="100%" fill="#fff" opacity="0" />
+                            <text id="reveal-word" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">AUDI</text>
+                        </mask>
+                    </defs>
+                    <image href="./media/car.avif" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask="url(#reveal-mask)" />
+                </svg>
+            </div>
+        </section>
+
+        <main>
+            <section>
+                <h2>After the recipe</h2>
+                <p>Scroll back up: the picture closes into the word again.</p>
+            </section>
             <div class="space"></div>
         </main>
 
@@ -278,6 +348,76 @@
                     invalidateOnRefresh: true,
                 },
             });
+
+            // Recipe — a word that opens onto a picture. The word grows from
+            // the stroke of a letter nearest its middle — nearly centred, and
+            // ending on picture: from the very middle it would end on the gap
+            // between two letters, the screen dark. Grown until that stroke is
+            // wider than the screen, the picture is whole, with no fade.
+            // One smoothing: Lenis glides already; without it, scrub: 1 does.
+            const word = document.getElementById("reveal-word");
+            if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+                gsap.set("#reveal-open", { opacity: 1 });
+            } else {
+                const stroke = strokeNearMiddle(word);
+                gsap.timeline({
+                    scrollTrigger: {
+                        trigger: "#reveal",
+                        start: "top top",
+                        end: "bottom bottom",
+                        scrub: lenis ? true : 1,
+                        invalidateOnRefresh: true, // the scale, again, when the screen changes
+                    },
+                }).fromTo(
+                    word,
+                    { scale: 1 },
+                    {
+                        // Wide enough that the stroke reaches past both sides of
+                        // the screen from where it grows.
+                        scale: () => {
+                            const box = word.getBBox();
+                            const at = box.x + stroke.at * box.width;
+                            return (2.2 * Math.max(at, innerWidth - at)) / (stroke.width * box.width);
+                        },
+                        transformOrigin: `${(stroke.at * 100).toFixed(2)}% 50%`,
+                        ease: "power3.in",
+                    },
+                );
+            }
+
+            // The stroke nearest the word's middle, as fractions of its width:
+            // where it is and how wide. Drawn once on a canvas in the word's
+            // own font and read across its middle row.
+            function strokeNearMiddle(text) {
+                const style = getComputedStyle(text);
+                const size = 200;
+                const spacing = (parseFloat(style.letterSpacing) || 0) * (size / parseFloat(style.fontSize));
+                const canvas = document.createElement("canvas");
+                const pen = canvas.getContext("2d", { willReadFrequently: true });
+                const set = () => {
+                    pen.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+                    pen.letterSpacing = `${spacing}px`;
+                    pen.textBaseline = "middle";
+                };
+                set();
+                const width = Math.ceil(pen.measureText(text.textContent).width);
+                canvas.width = width;
+                canvas.height = size * 1.4;
+                set(); // a canvas resized forgets its pen
+                pen.fillText(text.textContent, 0, canvas.height / 2);
+                const row = pen.getImageData(0, canvas.height / 2, width, 1).data;
+                let best = null;
+                for (let x = 0, from = -1; x <= width; x++) {
+                    const ink = x < width && row[x * 4 + 3] > 128;
+                    if (ink && from < 0) from = x;
+                    if (!ink && from >= 0) {
+                        const stroke = { at: (from + x) / 2 / width, width: (x - from) / width };
+                        if (!best || Math.abs(stroke.at - 0.5) < Math.abs(best.at - 0.5)) best = stroke;
+                        from = -1;
+                    }
+                }
+                return best || { at: 0.5, width: 1 }; // no ink found: the middle
+            }
 
             // The page grows: late content above the card.
             const grown = document.getElementById("grown");

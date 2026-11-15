@@ -168,8 +168,126 @@ See [`examples/react/Example.tsx`](examples/react/Example.tsx).
 Lenis (`?lenis`), and without the connector (`?off`), to see the
 difference: grow the page above the card and watch ScrollTrigger's markers
 follow it — or, without the connector, stay where they were. A card that
-widens as it scrolls through, and a pinned section whose strip slides
-across.
+widens as it scrolls through, a pinned section whose strip slides
+across, and the recipe — a word that opens onto a picture. Its photo is in
+`examples/static/media/`.
+
+## Recipes
+
+Plain GSAP on the connected page — no package of their own, a few lines
+each. The connector only keeps them in step with the scroll, Lenis or not.
+
+### A word that opens onto a picture
+
+The picture shows only through the letters of a word; as the page scrolls
+the word comes at you — grows from the stroke nearest its middle — until
+the picture fills the screen. Scroll back and it closes again.
+
+```html
+<section class="reveal">
+    <div class="reveal-stage">
+        <svg role="img" aria-label="…">
+            <defs>
+                <mask id="reveal-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+                    <rect id="reveal-open" width="100%" height="100%" fill="#fff" opacity="0" />
+                    <text id="reveal-word" x="50%" y="50%" text-anchor="middle" dominant-baseline="central">AUDI</text>
+                </mask>
+            </defs>
+            <image href="car.avif" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" mask="url(#reveal-mask)" />
+        </svg>
+    </div>
+</section>
+```
+
+```css
+.reveal { height: 400svh; background: #0d0d0f; }          /* four screens */
+.reveal-stage { position: sticky; top: 0; height: 100svh; overflow: clip; }
+.reveal svg { display: block; width: 100%; height: 100%; }
+#reveal-word { font: 900 min(28vw, 45svh) / 1 system-ui, sans-serif; fill: #fff; }
+@media (prefers-reduced-motion: reduce) { .reveal { height: auto; } }
+```
+
+```js
+const word = document.getElementById("reveal-word");
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    gsap.set("#reveal-open", { opacity: 1 }); // the picture, open
+} else {
+    const stroke = strokeNearMiddle(word);
+    gsap.timeline({
+        scrollTrigger: {
+            trigger: ".reveal",
+            start: "top top",
+            end: "bottom bottom",
+            scrub: lenis ? true : 1,
+            invalidateOnRefresh: true,
+        },
+    }).fromTo(word, { scale: 1 }, {
+        scale: () => {
+            const box = word.getBBox();
+            const at = box.x + stroke.at * box.width;
+            return (2.2 * Math.max(at, innerWidth - at)) / (stroke.width * box.width);
+        },
+        transformOrigin: `${stroke.at * 100}% 50%`,
+        ease: "power3.in",
+    });
+}
+
+function strokeNearMiddle(text) {
+    const style = getComputedStyle(text);
+    const size = 200;
+    const spacing = (parseFloat(style.letterSpacing) || 0) * (size / parseFloat(style.fontSize));
+    const canvas = document.createElement("canvas");
+    const pen = canvas.getContext("2d", { willReadFrequently: true });
+    const set = () => {
+        pen.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+        pen.letterSpacing = `${spacing}px`;
+        pen.textBaseline = "middle";
+    };
+    set();
+    const width = Math.ceil(pen.measureText(text.textContent).width);
+    canvas.width = width;
+    canvas.height = size * 1.4;
+    set(); // a canvas resized forgets its pen
+    pen.fillText(text.textContent, 0, canvas.height / 2);
+    const row = pen.getImageData(0, canvas.height / 2, width, 1).data;
+    let best = null;
+    for (let x = 0, from = -1; x <= width; x++) {
+        const ink = x < width && row[x * 4 + 3] > 128;
+        if (ink && from < 0) from = x;
+        if (!ink && from >= 0) {
+            const stroke = { at: (from + x) / 2 / width, width: (x - from) / width };
+            if (!best || Math.abs(stroke.at - 0.5) < Math.abs(best.at - 0.5)) best = stroke;
+            from = -1;
+        }
+    }
+    return best || { at: 0.5, width: 1 }; // no ink found: the middle
+}
+```
+
+- **An SVG mask, not CSS `mask-image`.** White in the mask shows the
+  picture, black hides it. The word is real text in the SVG — any font the
+  page has, any word, no image of it to make — and it needs no `-webkit-`
+  prefix anywhere.
+- **It grows from the stroke nearest its middle.** From the very middle a
+  word would end on the gap between two letters — a dark screen. So
+  `strokeNearMiddle` draws the word once on a canvas, in its own font, and
+  reads across its middle row for the stroke closest to the centre — in
+  AUDI, the right side of the U. The word grows from there: nearly centred,
+  for any word.
+- **It ends whole, with no fade.** The scale is worked out so that stroke
+  grows wider than the screen from where it stands — the picture ends
+  uncovered, on any screen. `invalidateOnRefresh` works it out again when
+  the window changes.
+- **`power3.in`:** slow at first, so the word answers the first scroll
+  without rushing at you; fast at the end.
+- **Held by CSS `sticky`, not `pin: true`.** The section is four screens
+  tall in the first HTML. A pin adds its height only when the script runs —
+  on a reload the browser restores the scroll to the shorter page, then the
+  pin pushes everything down, and the scene flashes by.
+- **One smoothing:** `scrub: true` with Lenis, `scrub: 1` without — see
+  With Lenis, smooth once.
+- **Reduced motion:** the mask's white rectangle on, the section one screen
+  tall — the picture, open, at once.
 
 ## From the old gsap folder
 
