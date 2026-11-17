@@ -3,8 +3,8 @@
      Pinned to this release, so the page and the code always match.
      With Lenis by default; ?nolenis: the same page with the browser's own
      scroll. ?off: without the connector, to see
-     what it does. The recipe at the end is plain GSAP — no package of its
-     own; its photo sits beside this file, in media/. -->
+     what it does. The two recipes at the end are plain GSAP — no package
+     of their own; their photo and video sit beside this file, in media/. -->
 <html lang="en">
     <head>
         <meta charset="utf-8" />
@@ -235,6 +235,131 @@
                     height: auto;
                 }
             }
+
+            /*
+             * Recipe — a video that grows as it passes. 16:9 in the page; as
+             * it comes to the middle of the screen it grows, and as the page
+             * goes on it shrinks back. Nothing is pinned: the page scrolls on
+             * all the while.
+             *
+             * The section is the area kept for it — one screen, so nothing
+             * around moves or is covered — and the video sits in its middle.
+             * What it grows to is a box in the middle of that area: the whole
+             * area, or less. The size is CSS: GSAP only moves
+             * --pg-gsap-connector-grow-progress, 0 at rest to 1 grown, and the
+             * width, height and corners follow from it — a resize, a turned
+             * phone, needs nothing from the script.
+             *
+             * Set on the section or any parent; a breakpoint can set its own:
+             *   --pg-gsap-connector-grow-width     its width at rest — vw, rem
+             *                                      or px, not % (its height
+             *                                      is worked out from it);
+             *                                      16:9. Not set: min(60vw, 64rem)
+             *   --pg-gsap-connector-grow-radius    its corners at rest; grown,
+             *                                      none. Not set: 1.5rem
+             *   --pg-gsap-connector-grow-to-width  the width it grows to. Not
+             *                                      set: 100% — the area's width
+             *   --pg-gsap-connector-grow-to-height the height it grows to. Not
+             *                                      set: 100% — with 100% wide,
+             *                                      the whole area, the video
+             *                                      cropped to fill it; auto:
+             *                                      16:9 of the width, uncropped
+             *                                      (never taller than the area)
+             * The width at rest is meant to be less than the width grown.
+             *
+             * One screen is 100svh: the screen with the browser's bars shown,
+             * which does not change as they hide — 100dvh would, and the area
+             * would grow and shrink under the reader as a phone scrolls.
+             */
+            .pg-gsap-connector-grow {
+                height: 100svh;
+                /* One cell the area's own size — not the video's: a tall
+                   video would stretch an auto row to its own height. */
+                display: grid;
+                grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+                place-items: center;
+                /* The area kept for it: a light pink, to see it here. */
+                background: color-mix(in srgb, #ff0033 9%, var(--bg));
+            }
+            /* What it grows to: an unseen box in the middle of the area. */
+            .pg-gsap-connector-grow-to {
+                width: var(--pg-gsap-connector-grow-to-width, 100%);
+                height: var(--pg-gsap-connector-grow-to-height, 100%);
+                max-width: 100%;
+                max-height: 100%;
+                aspect-ratio: 16 / 9; /* used only when the height is auto */
+                display: grid;
+                grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+                place-items: center;
+            }
+            .pg-gsap-connector-grow-frame {
+                --rest: var(--pg-gsap-connector-grow-width, min(60vw, 64rem));
+                --p: var(--pg-gsap-connector-grow-progress, 0);
+                position: relative;
+                width: calc(var(--rest) + (100% - var(--rest)) * var(--p));
+                height: calc(var(--rest) * 9 / 16 + (100% - var(--rest) * 9 / 16) * var(--p));
+                border-radius: calc(var(--pg-gsap-connector-grow-radius, 1.5rem) * (1 - var(--p)));
+                overflow: clip;
+                background: #000;
+            }
+            .pg-gsap-connector-grow-frame video {
+                display: block;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+            .pg-gsap-connector-grow-frame:fullscreen {
+                border-radius: 0;
+            }
+            .pg-gsap-connector-grow-frame:fullscreen video {
+                object-fit: contain;
+            }
+            /* Its buttons, at the bottom right: sound — only for a video
+               that has sound — play / pause, and full screen. Each shows the
+               icon of what it does now. */
+            .pg-gsap-connector-grow-buttons {
+                position: absolute;
+                right: 1.25rem;
+                bottom: 1.25rem;
+                display: flex;
+                gap: 0.5rem;
+            }
+            .pg-gsap-connector-grow-buttons button {
+                display: grid;
+                place-items: center;
+                width: 3rem;
+                height: 3rem;
+                padding: 0;
+                border: 2px solid #fff;
+                border-radius: 50%;
+                background: rgb(0 0 0 / 0.2);
+                color: #fff;
+                cursor: pointer;
+            }
+            .pg-gsap-connector-grow-buttons button:focus-visible {
+                outline: 2px solid #fff;
+                outline-offset: 3px;
+            }
+            .pg-gsap-connector-grow-buttons button[hidden] {
+                display: none;
+            }
+            .pg-gsap-connector-grow-buttons svg {
+                width: 1.25rem;
+                height: 1.25rem;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .pg-gsap-connector-grow-frame:not([data-pg-gsap-connector-grow-playing]) .is-pause,
+            [data-pg-gsap-connector-grow-playing] .is-play,
+            .pg-gsap-connector-grow-frame:not([data-pg-gsap-connector-grow-muted]) .is-muted,
+            [data-pg-gsap-connector-grow-muted] .is-sound,
+            .pg-gsap-connector-grow-frame:not(:fullscreen) .is-shrink,
+            .pg-gsap-connector-grow-frame:fullscreen .is-expand {
+                display: none;
+            }
         </style>
     </head>
     <body>
@@ -384,6 +509,82 @@
                 <h2>After the recipe</h2>
                 <p>Scroll back up: the picture closes into the word again.</p>
             </section>
+            <section>
+                <h2>Recipe — a video that grows as it passes</h2>
+                <p>
+                    No package of its own either: plain GSAP. A 16:9 video in the page; as it comes to the middle of
+                    the screen it grows, and as the page goes on it shrinks back to its place. Nothing is pinned —
+                    the page scrolls on all the while. It plays while it is in sight and stops when it is not —
+                    unless you stopped it: then it waits for you. Its buttons, at the bottom right: sound (only
+                    for a video with sound), play / pause and full screen.
+                </p>
+                <p>
+                    Or it waits for play from the start — <code>data-pg-gsap-connector-grow-autoplay="false"</code>
+                    on the section; once played, it plays in sight like the other. A picture to show while it
+                    waits is the video's own <code>poster</code>.
+                </p>
+                <div class="row">
+                    <a id="autoplay-on" href="?">Plays in sight</a>
+                    <a id="autoplay-off" href="?autoplay=off">Waits for play</a>
+                </div>
+                <p>
+                    The light pink is the area kept for it, one screen: nothing around moves or is covered. What
+                    it grows to is a box in its middle — the whole area, or less: CSS,
+                    <code>--pg-gsap-connector-grow-to-width</code> and <code>-to-height</code>. Its size at rest,
+                    <code>--pg-gsap-connector-grow-width</code>, and its corners,
+                    <code>--pg-gsap-connector-grow-radius</code>.
+                </p>
+                <div class="row">
+                    <a id="growto-full" href="?">The whole area</a>
+                    <a id="growto-wide" href="?growto=wide">The page's width, 16:9</a>
+                    <a id="growto-1200" href="?growto=1200">Up to 1200px, 16:9</a>
+                </div>
+            </section>
+        </main>
+
+        <!-- The recipe: the section is the area it grows to; the video, with
+             its buttons, in its middle. -->
+        <section class="pg-gsap-connector-grow" id="grow-video">
+            <div class="pg-gsap-connector-grow-to">
+                <div class="pg-gsap-connector-grow-frame" data-pg-gsap-connector-grow-muted>
+                    <video src="./media/grow.mp4" muted loop playsinline preload="metadata" aria-label="A video that grows as it passes"></video>
+                    <div class="pg-gsap-connector-grow-buttons">
+                        <button type="button" data-pg-gsap-connector-grow-button="sound" aria-label="Sound on" hidden>
+                            <svg class="is-muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" /></svg>
+                            <svg class="is-sound" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12" /></svg>
+                        </button>
+                        <button type="button" data-pg-gsap-connector-grow-button="play" aria-label="Play">
+                            <svg class="is-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+                            <svg class="is-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" /></svg>
+                        </button>
+                        <button type="button" data-pg-gsap-connector-grow-button="fullscreen" aria-label="Full screen">
+                            <svg class="is-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                            <svg class="is-shrink" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <script>
+            // ?growto, ?autoplay: what it grows to, whether it plays by
+            // itself — the settings, written as the HTML is read. Not set:
+            // the whole area, and it plays in sight.
+            (function (scene, query) {
+                var to = query.get("growto");
+                if (query.get("autoplay") === "off") scene.setAttribute("data-pg-gsap-connector-grow-autoplay", "false");
+                if (to === "wide") scene.style.setProperty("--pg-gsap-connector-grow-to-height", "auto");
+                if (to === "1200") {
+                    scene.style.setProperty("--pg-gsap-connector-grow-to-width", "min(100%, 1200px)");
+                    scene.style.setProperty("--pg-gsap-connector-grow-to-height", "auto");
+                }
+            })(document.currentScript.previousElementSibling, new URLSearchParams(location.search));
+        </script>
+
+        <main>
+            <section>
+                <h2>After it</h2>
+                <p>Scroll back up: it grows and shrinks again, the other way.</p>
+            </section>
             <div class="space"></div>
         </main>
 
@@ -495,6 +696,87 @@
                     .fromTo(".pg-gsap-connector-reveal-cover", { autoAlpha: 1 }, { autoAlpha: 0, ease: "power1.inOut", duration: 0.15 }, 0.85);
             }
 
+            // Recipe — a video that grows as it passes: from the moment the
+            // section's top is 60% down the screen it grows, full as the
+            // section fills the screen, held a moment, and shrinks back as it
+            // leaves — 0.2–0.45 grows, 0.55–0.8 shrinks, of a trigger that
+            // runs from the section coming in to it going out. Only the
+            // progress moves; the CSS turns it into a size.
+            // One smoothing: Lenis glides already; without it, scrub: 1 does.
+            const growReduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (!growReduced) {
+                const frame = document.querySelector("#grow-video .pg-gsap-connector-grow-frame");
+                gsap.timeline({
+                    scrollTrigger: { trigger: "#grow-video", start: "top bottom", end: "bottom top", scrub: lenis ? true : 1 },
+                })
+                    .fromTo(frame, { "--pg-gsap-connector-grow-progress": 0 }, { "--pg-gsap-connector-grow-progress": 1, ease: "power1.inOut", duration: 0.25 }, 0.2)
+                    .to(frame, { "--pg-gsap-connector-grow-progress": 0, ease: "power1.inOut", duration: 0.25 }, 0.55)
+                    .set({}, {}, 1);
+            }
+
+            // Its video: plays while the section is in sight, stops when it is
+            // not — unless the viewer stopped it; then it waits for them. With
+            // data-pg-gsap-connector-grow-autoplay="false", or reduced motion
+            // asked for, it waits from the start; once played, it plays in
+            // sight like the other. The buttons show what
+            // they do now: the frame carries -playing, -muted.
+            {
+                const scene = document.getElementById("grow-video");
+                const frame = scene.querySelector(".pg-gsap-connector-grow-frame");
+                const video = frame.querySelector("video");
+                const button = (name) => frame.querySelector(`[data-pg-gsap-connector-grow-button="${name}"]`);
+                const play = button("play");
+                const sound = button("sound");
+                const full = button("fullscreen");
+                // Waiting for the viewer: they stopped it, or it waits for play
+                // from the start (-autoplay="false"), or reduced motion.
+                let stopped = growReduced || scene.getAttribute("data-pg-gsap-connector-grow-autoplay") === "false";
+
+                const mark = (name, on) => (on ? frame.setAttribute(name, "") : frame.removeAttribute(name));
+                const show = () => {
+                    mark("data-pg-gsap-connector-grow-playing", !video.paused);
+                    mark("data-pg-gsap-connector-grow-muted", video.muted);
+                    play.setAttribute("aria-label", video.paused ? "Play" : "Pause");
+                    sound.setAttribute("aria-label", video.muted ? "Sound on" : "Sound off");
+                    full.setAttribute("aria-label", document.fullscreenElement === frame ? "Leave full screen" : "Full screen");
+                };
+                ["play", "pause", "volumechange"].forEach((type) => video.addEventListener(type, show));
+                document.addEventListener("fullscreenchange", show);
+
+                new IntersectionObserver(
+                    ([entry]) => {
+                        if (entry.isIntersecting && !stopped) video.play().catch(() => {});
+                        if (!entry.isIntersecting) video.pause();
+                    },
+                    { threshold: 0.25 },
+                ).observe(scene);
+
+                play.addEventListener("click", () => {
+                    stopped = !video.paused;
+                    if (stopped) video.pause();
+                    else video.play().catch(() => {});
+                });
+                sound.addEventListener("click", () => (video.muted = !video.muted));
+                full.addEventListener("click", () => {
+                    // Refused (a frame, a setting): nothing happens.
+                    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+                    else if (frame.requestFullscreen) frame.requestFullscreen().catch(() => {});
+                    else video.webkitEnterFullscreen?.(); // iPhone: the video alone
+                });
+
+                // Sound: the button shows only for a video that has some —
+                // known once it has played half a second.
+                const hasSound = () =>
+                    video.audioTracks ? video.audioTracks.length > 0 : "mozHasAudio" in video ? video.mozHasAudio : video.webkitAudioDecodedByteCount > 0;
+                const listen = () => {
+                    if (video.currentTime < 0.5) return;
+                    video.removeEventListener("timeupdate", listen);
+                    sound.hidden = !hasSound();
+                };
+                video.addEventListener("timeupdate", listen);
+                show();
+            }
+
             // The page grows: late content above the card.
             const grown = document.getElementById("grown");
             document.getElementById("grow").addEventListener("click", () => {
@@ -529,6 +811,16 @@
                 document.getElementById(`length-${length}`).href = link("length", length !== "225", length);
             }
             document.getElementById(`length-${query.get("length") ?? "225"}`)?.setAttribute("aria-current", "true");
+            // What the video grows to; the whole screen is no setting at all.
+            const growTo = ["wide", "1200"].includes(query.get("growto")) ? query.get("growto") : "full";
+            for (const to of ["full", "wide", "1200"]) {
+                document.getElementById(`growto-${to}`).href = link("growto", to !== "full", to);
+            }
+            document.getElementById(`growto-${growTo}`).setAttribute("aria-current", "true");
+            const autoplayOff = query.get("autoplay") === "off";
+            document.getElementById("autoplay-on").href = link("autoplay", false);
+            document.getElementById("autoplay-off").href = link("autoplay", true, "off");
+            document.getElementById(autoplayOff ? "autoplay-off" : "autoplay-on").setAttribute("aria-current", "true");
             // A shared link to the recipe: this page's switches, and #reveal.
             document.getElementById("hash-on").href = `${link("off", false)}#reveal`;
             document.getElementById("hash-off").href = `${link("off", true)}#reveal`;

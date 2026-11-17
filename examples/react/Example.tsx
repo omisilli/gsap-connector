@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -227,5 +227,151 @@ export function WordReveal({
                 />
             )}
         </>
+    );
+}
+
+/*
+ * Recipe — a video that grows as it passes (see the README; its CSS goes in
+ * the site's stylesheet, the classes below are the README's). 16:9 in the
+ * page; as it comes to the middle of the screen it grows to its box — the
+ * whole area by default, or --pg-gsap-connector-grow-to-width / -to-height
+ * — and as the page goes on it shrinks back. Nothing is pinned. The section
+ * is one screen, 100svh, from the server's HTML: the room it grows in is
+ * already there. GSAP moves --pg-gsap-connector-grow-progress, 0 to 1 and
+ * back; the CSS works the size out from it.
+ *
+ * It plays while the section is in sight and stops when it is not —
+ * unless the viewer stopped it. autoplay={false}: it waits for play from
+ * the start; once played, it plays in sight like the other. poster: the
+ * picture shown while it waits. The sound button shows only for a video
+ * that has sound.
+ */
+export function VideoGrow({
+    src,
+    poster,
+    label,
+    autoplay = true,
+}: {
+    src: string;
+    poster?: string;
+    label: string;
+    autoplay?: boolean;
+}) {
+    const section = useRef<HTMLElement>(null);
+    const frame = useRef<HTMLDivElement>(null);
+    const video = useRef<HTMLVideoElement>(null);
+    const stopped = useRef(!autoplay); // by the viewer, or waiting from the start
+    const lenis = useLenis();
+    const [playing, setPlaying] = useState(false);
+    const [muted, setMuted] = useState(true);
+    const [full, setFull] = useState(false);
+    const [hasSound, setHasSound] = useState(false);
+
+    // The size.
+    useGSAP(
+        () => {
+            if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+            gsap.timeline({
+                scrollTrigger: { trigger: section.current, start: "top bottom", end: "bottom top", scrub: lenis ? true : 1 }, // one smoothing
+            })
+                .fromTo(frame.current, { "--pg-gsap-connector-grow-progress": 0 }, { "--pg-gsap-connector-grow-progress": 1, ease: "power1.inOut", duration: 0.25 }, 0.2)
+                .to(frame.current, { "--pg-gsap-connector-grow-progress": 0, ease: "power1.inOut", duration: 0.25 }, 0.55)
+                .set({}, {}, 1);
+        },
+        { scope: section, dependencies: [lenis], revertOnUpdate: true },
+    );
+
+    // The video: in sight or not, its state for the buttons, its sound.
+    useEffect(() => {
+        const scene = section.current;
+        const v = video.current;
+        if (!scene || !v) return;
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) stopped.current = true;
+        const show = () => {
+            setPlaying(!v.paused);
+            setMuted(v.muted);
+        };
+        const onFull = () => setFull(document.fullscreenElement === frame.current);
+        const listen = () => {
+            if (v.currentTime < 0.5) return;
+            v.removeEventListener("timeupdate", listen);
+            const media = v as HTMLVideoElement & { audioTracks?: { length: number }; mozHasAudio?: boolean; webkitAudioDecodedByteCount?: number };
+            setHasSound(media.audioTracks ? media.audioTracks.length > 0 : "mozHasAudio" in media ? !!media.mozHasAudio : (media.webkitAudioDecodedByteCount ?? 0) > 0);
+        };
+        const types = ["play", "pause", "volumechange"] as const;
+        types.forEach((type) => v.addEventListener(type, show));
+        v.addEventListener("timeupdate", listen);
+        document.addEventListener("fullscreenchange", onFull);
+        const sight = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !stopped.current) v.play().catch(() => {});
+                if (!entry.isIntersecting) v.pause();
+            },
+            { threshold: 0.25 },
+        );
+        sight.observe(scene);
+        return () => {
+            sight.disconnect();
+            types.forEach((type) => v.removeEventListener(type, show));
+            v.removeEventListener("timeupdate", listen);
+            document.removeEventListener("fullscreenchange", onFull);
+        };
+    }, []);
+
+    const togglePlay = () => {
+        const v = video.current!;
+        stopped.current = !v.paused;
+        if (stopped.current) v.pause();
+        else v.play().catch(() => {});
+    };
+    const toggleSound = () => {
+        video.current!.muted = !video.current!.muted;
+    };
+    const toggleFull = () => {
+        const v = video.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if (frame.current?.requestFullscreen) frame.current.requestFullscreen().catch(() => {});
+        else v.webkitEnterFullscreen?.(); // iPhone: the video alone
+    };
+
+    return (
+        <section ref={section} className="pg-gsap-connector-grow">
+            <div className="pg-gsap-connector-grow-to">
+                <div
+                    ref={frame}
+                    className="pg-gsap-connector-grow-frame"
+                    data-pg-gsap-connector-grow-playing={playing ? "" : undefined}
+                    data-pg-gsap-connector-grow-muted={muted ? "" : undefined}
+                >
+                    <video ref={video} src={src} poster={poster} muted loop playsInline preload="metadata" aria-label={label} />
+                    <div className="pg-gsap-connector-grow-buttons">
+                        <button type="button" onClick={toggleSound} aria-label={muted ? "Sound on" : "Sound off"} hidden={!hasSound}>
+                            <svg className="is-muted" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" />
+                            </svg>
+                            <svg className="is-sound" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 9h4l5-4v14l-5-4H4zM17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12" />
+                            </svg>
+                        </button>
+                        <button type="button" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+                            <svg className="is-play" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8 5.5v13l10.5-6.5z" />
+                            </svg>
+                            <svg className="is-pause" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 5v14M15 5v14" />
+                            </svg>
+                        </button>
+                        <button type="button" onClick={toggleFull} aria-label={full ? "Leave full screen" : "Full screen"}>
+                            <svg className="is-expand" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+                            </svg>
+                            <svg className="is-shrink" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }
