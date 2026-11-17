@@ -243,8 +243,8 @@ export function WordReveal({
  * It plays while the section is in sight and stops when it is not —
  * unless the viewer stopped it. autoplay={false}: it waits for play from
  * the start; once played, it plays in sight like the other. poster: the
- * picture shown while it waits. The sound button shows only for a video
- * that has sound.
+ * picture shown while it waits. It starts muted; the sound button turns
+ * it on.
  */
 export function VideoGrow({
     src,
@@ -265,7 +265,6 @@ export function VideoGrow({
     const [playing, setPlaying] = useState(false);
     const [muted, setMuted] = useState(true);
     const [full, setFull] = useState(false);
-    const [hasSound, setHasSound] = useState(false);
 
     // The size.
     useGSAP(
@@ -281,7 +280,7 @@ export function VideoGrow({
         { scope: section, dependencies: [lenis], revertOnUpdate: true },
     );
 
-    // The video: in sight or not, its state for the buttons, its sound.
+    // The video: in sight or not, and its state for the buttons.
     useEffect(() => {
         const scene = section.current;
         const v = video.current;
@@ -292,15 +291,8 @@ export function VideoGrow({
             setMuted(v.muted);
         };
         const onFull = () => setFull(document.fullscreenElement === frame.current);
-        const listen = () => {
-            if (v.currentTime < 0.5) return;
-            v.removeEventListener("timeupdate", listen);
-            const media = v as HTMLVideoElement & { audioTracks?: { length: number }; mozHasAudio?: boolean; webkitAudioDecodedByteCount?: number };
-            setHasSound(media.audioTracks ? media.audioTracks.length > 0 : "mozHasAudio" in media ? !!media.mozHasAudio : (media.webkitAudioDecodedByteCount ?? 0) > 0);
-        };
         const types = ["play", "pause", "volumechange"] as const;
         types.forEach((type) => v.addEventListener(type, show));
-        v.addEventListener("timeupdate", listen);
         document.addEventListener("fullscreenchange", onFull);
         const sight = new IntersectionObserver(
             ([entry]) => {
@@ -313,7 +305,6 @@ export function VideoGrow({
         return () => {
             sight.disconnect();
             types.forEach((type) => v.removeEventListener(type, show));
-            v.removeEventListener("timeupdate", listen);
             document.removeEventListener("fullscreenchange", onFull);
         };
     }, []);
@@ -345,7 +336,7 @@ export function VideoGrow({
                 >
                     <video ref={video} src={src} poster={poster} muted loop playsInline preload="metadata" aria-label={label} />
                     <div className="pg-gsap-connector-grow-buttons">
-                        <button type="button" onClick={toggleSound} aria-label={muted ? "Sound on" : "Sound off"} hidden={!hasSound}>
+                        <button type="button" onClick={toggleSound} aria-label={muted ? "Sound on" : "Sound off"}>
                             <svg className="is-muted" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" />
                             </svg>

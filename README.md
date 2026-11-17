@@ -399,8 +399,8 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
 A 16:9 video in the page. As it comes to the middle of the screen it
 grows, and as the page goes on it shrinks back to its place. Nothing is
 pinned: the page scrolls on all the while. It plays while it is in sight
-and stops when it is not; its buttons, at the bottom right: sound (only for
-a video with sound), play / pause and full screen.
+and stops when it is not; its buttons, at the bottom right: sound, play /
+pause and full screen.
 
 ```html
 <section class="pg-gsap-connector-grow" id="grow-video">  <!-- data-pg-gsap-connector-grow-autoplay="false": waits for play -->
@@ -408,7 +408,7 @@ a video with sound), play / pause and full screen.
         <div class="pg-gsap-connector-grow-frame" data-pg-gsap-connector-grow-muted>
             <video src="grow.mp4" muted loop playsinline preload="metadata" aria-label="…"></video>  <!-- poster="cover.jpg": shown while it waits -->
             <div class="pg-gsap-connector-grow-buttons">
-                <button type="button" data-pg-gsap-connector-grow-button="sound" aria-label="Sound on" hidden>
+                <button type="button" data-pg-gsap-connector-grow-button="sound" aria-label="Sound on">
                     <svg class="is-muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" /></svg>
                     <svg class="is-sound" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 8.5a5 5 0 0 1 0 7M19.5 6a8.5 8.5 0 0 1 0 12" /></svg>
                 </button>
@@ -465,9 +465,8 @@ a video with sound), play / pause and full screen.
 .pg-gsap-connector-grow-buttons { position: absolute; right: 1.25rem; bottom: 1.25rem; display: flex; gap: 0.5rem; }
 .pg-gsap-connector-grow-buttons button {
     display: grid; place-items: center; width: 3rem; height: 3rem; padding: 0;
-    border: 2px solid #fff; border-radius: 50%; background: rgb(0 0 0 / 0.2); color: #fff; cursor: pointer;
+    border: 2px solid rgb(255 255 255 / 0.5); border-radius: 50%; background: rgb(0 0 0 / 0.2); color: #fff; cursor: pointer;
 }
-.pg-gsap-connector-grow-buttons button[hidden] { display: none; }
 .pg-gsap-connector-grow-buttons svg {
     width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
@@ -536,16 +535,6 @@ full.addEventListener("click", () => {
     else video.webkitEnterFullscreen?.(); // iPhone: the video alone
 });
 
-// The sound button only for a video that has sound — known once it has
-// played half a second.
-const hasSound = () =>
-    video.audioTracks ? video.audioTracks.length > 0 : "mozHasAudio" in video ? video.mozHasAudio : video.webkitAudioDecodedByteCount > 0;
-const listen = () => {
-    if (video.currentTime < 0.5) return;
-    video.removeEventListener("timeupdate", listen);
-    sound.hidden = !hasSound();
-};
-video.addEventListener("timeupdate", listen);
 show();
 ```
 
@@ -584,10 +573,8 @@ show();
   for play from the start; once played, it plays in sight like the other.
   A picture to show while it waits is the video's own `poster`. `muted` and
   `playsinline` let a browser play it without a press.
-- **Sound only when there is some.** The sound button is `hidden` until
-  the video has played half a second; then it shows if the video has a
-  sound track — `audioTracks` (Safari), `mozHasAudio` (Firefox), the audio
-  bytes decoded (Chrome). A silent video never shows it.
+- **It starts muted** — a browser plays a video by itself only without
+  sound; the sound button, leftmost, turns it on and off.
 - **Full screen: the frame,** so the buttons come with it — the same
   button, or Esc, leaves. On an iPhone, which puts only a video in full
   screen, the video itself.
