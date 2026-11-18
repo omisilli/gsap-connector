@@ -273,7 +273,9 @@
              *
              * One screen is 100svh: the screen with the browser's bars shown,
              * which does not change as they hide — 100dvh would, and the area
-             * would grow and shrink under the reader as a phone scrolls.
+             * would grow and shrink under the reader as a phone scrolls; 100vh
+             * on an iPhone is the screen with them hidden, taller than what
+             * shows while they are there.
              */
             .pg-gsap-connector-grow {
                 height: 100svh;
@@ -284,6 +286,14 @@
                 place-items: center;
                 /* The area kept for it: a light pink, to see it here. */
                 background: color-mix(in srgb, #ff0033 9%, var(--bg));
+            }
+            /* ?growto=split, the example's own: the whole area on a
+               computer, 16:9 of the screen's width on a phone — one
+               breakpoint is all it takes. */
+            @media (max-width: 47.99rem) {
+                .pg-gsap-connector-grow.growto-split {
+                    --pg-gsap-connector-grow-to-height: auto;
+                }
             }
             /* What it grows to: an unseen box in the middle of the area. */
             .pg-gsap-connector-grow-to {
@@ -539,7 +549,13 @@
                     <a id="growto-full" href="?">The whole area</a>
                     <a id="growto-wide" href="?growto=wide">The page's width, 16:9</a>
                     <a id="growto-1200" href="?growto=1200">Up to 1200px, 16:9</a>
+                    <a id="growto-split" href="?growto=split">The whole area on a computer, 16:9 on a phone</a>
                 </div>
+                <p>
+                    A phone can have a video of its own: a <code>&lt;source&gt;</code> with <code>media</code>, the
+                    phone's first — the browser takes the first that fits, as the page loads. Here both are
+                    <code>grow.mp4</code> for now; a phone's own file goes in the first.
+                </p>
             </section>
         </main>
 
@@ -548,7 +564,11 @@
         <section class="pg-gsap-connector-grow" id="grow-video">
             <div class="pg-gsap-connector-grow-to">
                 <div class="pg-gsap-connector-grow-frame" data-pg-gsap-connector-grow-muted>
-                    <video src="./media/grow.mp4" muted loop playsinline preload="metadata" aria-label="A video that grows as it passes"></video>
+                    <video muted loop playsinline preload="metadata" aria-label="A video that grows as it passes">
+                        <!-- The phone's: its own file here, when there is one. -->
+                        <source src="./media/grow.mp4" media="(max-width: 47.99rem)" type="video/mp4" />
+                        <source src="./media/grow.mp4" type="video/mp4" />
+                    </video>
                     <div class="pg-gsap-connector-grow-buttons">
                         <button type="button" data-pg-gsap-connector-grow-button="sound" aria-label="Sound on">
                             <svg class="is-muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" /></svg>
@@ -574,6 +594,7 @@
                 var to = query.get("growto");
                 if (query.get("autoplay") === "off") scene.setAttribute("data-pg-gsap-connector-grow-autoplay", "false");
                 if (to === "wide") scene.style.setProperty("--pg-gsap-connector-grow-to-height", "auto");
+                if (to === "split") scene.classList.add("growto-split");
                 if (to === "1200") {
                     scene.style.setProperty("--pg-gsap-connector-grow-to-width", "min(100%, 1200px)");
                     scene.style.setProperty("--pg-gsap-connector-grow-to-height", "auto");
@@ -803,8 +824,8 @@
             }
             document.getElementById(`length-${query.get("length") ?? "225"}`)?.setAttribute("aria-current", "true");
             // What the video grows to; the whole screen is no setting at all.
-            const growTo = ["wide", "1200"].includes(query.get("growto")) ? query.get("growto") : "full";
-            for (const to of ["full", "wide", "1200"]) {
+            const growTo = ["wide", "1200", "split"].includes(query.get("growto")) ? query.get("growto") : "full";
+            for (const to of ["full", "wide", "1200", "split"]) {
                 document.getElementById(`growto-${to}`).href = link("growto", to !== "full", to);
             }
             document.getElementById(`growto-${growTo}`).setAttribute("aria-current", "true");

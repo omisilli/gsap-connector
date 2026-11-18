@@ -245,14 +245,24 @@ export function WordReveal({
  * the start; once played, it plays in sight like the other. poster: the
  * picture shown while it waits. It starts muted; the sound button turns
  * it on.
+ *
+ * phoneSrc: a phone's own video, chosen as the page loads by phoneMedia
+ * (below 48rem by default) — <source media>, the browser's own choice.
+ * What it grows to per screen size is the stylesheet's: a media query
+ * setting --pg-gsap-connector-grow-to-height: auto on a phone gives 16:9
+ * there, the whole area elsewhere.
  */
 export function VideoGrow({
     src,
+    phoneSrc,
+    phoneMedia = "(max-width: 47.99rem)",
     poster,
     label,
     autoplay = true,
 }: {
     src: string;
+    phoneSrc?: string;
+    phoneMedia?: string;
     poster?: string;
     label: string;
     autoplay?: boolean;
@@ -334,7 +344,10 @@ export function VideoGrow({
                     data-pg-gsap-connector-grow-playing={playing ? "" : undefined}
                     data-pg-gsap-connector-grow-muted={muted ? "" : undefined}
                 >
-                    <video ref={video} src={src} poster={poster} muted loop playsInline preload="metadata" aria-label={label} />
+                    <video ref={video} src={phoneSrc ? undefined : src} poster={poster} muted loop playsInline preload="metadata" aria-label={label}>
+                        {phoneSrc && <source src={phoneSrc} media={phoneMedia} type="video/mp4" />}
+                        {phoneSrc && <source src={src} type="video/mp4" />}
+                    </video>
                     <div className="pg-gsap-connector-grow-buttons">
                         <button type="button" onClick={toggleSound} aria-label={muted ? "Sound on" : "Sound off"}>
                             <svg className="is-muted" viewBox="0 0 24 24" aria-hidden="true">

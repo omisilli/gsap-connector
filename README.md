@@ -406,7 +406,10 @@ pause and full screen.
 <section class="pg-gsap-connector-grow" id="grow-video">  <!-- data-pg-gsap-connector-grow-autoplay="false": waits for play -->
     <div class="pg-gsap-connector-grow-to">
         <div class="pg-gsap-connector-grow-frame" data-pg-gsap-connector-grow-muted>
-            <video src="grow.mp4" muted loop playsinline preload="metadata" aria-label="…"></video>  <!-- poster="cover.jpg": shown while it waits -->
+            <video muted loop playsinline preload="metadata" aria-label="…">  <!-- poster="cover.jpg": shown while it waits -->
+                <source src="grow-phone.mp4" media="(max-width: 47.99rem)" type="video/mp4" />  <!-- a phone's own; leave out for one video -->
+                <source src="grow.mp4" type="video/mp4" />
+            </video>
             <div class="pg-gsap-connector-grow-buttons">
                 <button type="button" data-pg-gsap-connector-grow-button="sound" aria-label="Sound on">
                     <svg class="is-muted" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6" /></svg>
@@ -545,11 +548,34 @@ show();
   `--pg-gsap-connector-grow-to-width` and `-to-height`: the whole area
   (both `100%`, the video cropped to fill it), the page's width at 16:9
   (`-to-height: auto`), or less — `min(100%, 1200px)` wide, 16:9. Never
-  bigger than the area. A breakpoint can set its own.
-- **100svh, not 100dvh.** One screen is the screen with the browser's bars
-  shown, which does not change as they hide. A `dvh` area would grow and
-  shrink under the reader as a phone scrolls, and every trigger below it
-  would be measured again.
+  bigger than the area.
+- **Per screen size: a breakpoint.** The settings are CSS, so a media
+  query sets its own — the whole area on a computer, 16:9 of the screen's
+  width on a phone:
+
+  ```css
+  @media (max-width: 47.99rem) {
+      .pg-gsap-connector-grow { --pg-gsap-connector-grow-to-height: auto; }
+  }
+  ```
+
+  The size at rest the same way: `--pg-gsap-connector-grow-width: 80vw`
+  on a phone, where 60vw is small.
+- **A video per screen size: `<source media>`.** The phone's first — the
+  browser takes the first `<source>` whose `media` fits, as the page
+  loads; the last, without `media`, is everyone else's. A phone can have a
+  smaller file, cut for its screen. Chosen once: turning a phone or
+  resizing a window later keeps the video it has. One video for all:
+  `src` on the `<video>`, no `<source>`.
+- **100svh, not 100dvh — or vh.** On a phone the browser's bars hide as
+  the page scrolls down and come back as it scrolls up. `svh` is the screen
+  with the bars shown: it does not change as they come and go, so the area
+  stays as it is — the grown video leaves a strip the bars' height when
+  they are hidden, and that is all. `dvh` follows the bars: the area, and
+  the video in it, would grow and shrink under the reader's finger, and
+  every trigger below would be measured again. `vh` is the screen with
+  the bars hidden on iOS: taller than what shows while they are there,
+  so the grown video would run under them.
 - **The size is CSS.** GSAP moves one number,
   `--pg-gsap-connector-grow-progress`, from 0 to 1 and back; the width,
   height and corners are worked out from it in the stylesheet, between
