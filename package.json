@@ -1,6 +1,6 @@
 {
     "name": "@plusguard/gsap-connector",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "description": "Connects GSAP's ScrollTrigger to the page, with or without Lenis: runs Lenis on GSAP's ticker, keeps ScrollTrigger in step with every scroll, refreshes the triggers when the page changes height, and brings a reload, or a link to a #id, to the right place. Takes your own GSAP — no second copy. Zero dependencies.",
     "type": "module",
     "main": "./dist/index.js",
@@ -17,6 +17,7 @@
     "scripts": {
         "build": "npx -p typescript tsc index.ts --outDir dist --declaration --target es2020 --module es2020 --lib dom,es2020 --strict"
     },
+    "publishConfig": { "access": "public" },
     "license": "MIT",
     "author": "PlusGuard",
     "repository": { "type": "git", "url": "git+https://github.com/omisilli/gsap-connector.git" },
